@@ -1,0 +1,750 @@
+-- ============================================================
+-- BOOSTLAB • FLY SCRIPT
+-- Intro -> Fly UI
+-- ============================================================
+
+local Players = game:GetService("Players")
+local TweenService = game:GetService("TweenService")
+local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
+
+local LocalPlayer = Players.LocalPlayer
+
+-- ============================================================
+-- INTRO ANIMATION - BoostLab polished startup
+-- ============================================================
+
+local function playIntro()
+	local playerGui = LocalPlayer:WaitForChild("PlayerGui")
+
+	local old = playerGui:FindFirstChild("BoostLabIntro")
+	if old then
+		old:Destroy()
+	end
+
+	local gui = Instance.new("ScreenGui")
+	gui.Name = "BoostLabIntro"
+	gui.IgnoreGuiInset = true
+	gui.ResetOnSpawn = false
+	gui.DisplayOrder = 99999
+	gui.Parent = playerGui
+
+	local root = Instance.new("Frame")
+	root.Size = UDim2.fromScale(1, 1)
+	root.BackgroundColor3 = Color3.fromRGB(4, 2, 9)
+	root.BorderSizePixel = 0
+	root.Parent = gui
+
+	local bgGradient = Instance.new("UIGradient")
+	bgGradient.Color = ColorSequence.new({
+		ColorSequenceKeypoint.new(0, Color3.fromRGB(5, 2, 12)),
+		ColorSequenceKeypoint.new(0.48, Color3.fromRGB(31, 7, 54)),
+		ColorSequenceKeypoint.new(1, Color3.fromRGB(4, 2, 10))
+	})
+	bgGradient.Rotation = 35
+	bgGradient.Parent = root
+
+	local glow = Instance.new("Frame")
+	glow.AnchorPoint = Vector2.new(0.5, 0.5)
+	glow.Position = UDim2.fromScale(0.5, 0.43)
+	glow.Size = UDim2.fromScale(0.18, 0.18)
+	glow.BackgroundColor3 = Color3.fromRGB(170, 55, 255)
+	glow.BackgroundTransparency = 0.74
+	glow.BorderSizePixel = 0
+	glow.Parent = root
+
+	local glowCorner = Instance.new("UICorner")
+	glowCorner.CornerRadius = UDim.new(1, 0)
+	glowCorner.Parent = glow
+
+	local glowScale = Instance.new("UIScale")
+	glowScale.Scale = 0.7
+	glowScale.Parent = glow
+
+	local rings = {}
+
+	for i = 1, 3 do
+		local ring = Instance.new("Frame")
+		ring.AnchorPoint = Vector2.new(0.5, 0.5)
+		ring.Position = UDim2.fromScale(0.5, 0.43)
+		ring.Size = UDim2.fromScale(
+			0.17 + i * 0.045,
+			0.17 + i * 0.045
+		)
+		ring.BackgroundTransparency = 1
+		ring.BorderSizePixel = 0
+		ring.Parent = root
+
+		local stroke = Instance.new("UIStroke")
+		stroke.Color = Color3.fromRGB(176, 65, 245)
+		stroke.Transparency = 0.55 + i * 0.1
+		stroke.Thickness = 1.5
+		stroke.Parent = ring
+
+		local corner = Instance.new("UICorner")
+		corner.CornerRadius = UDim.new(1, 0)
+		corner.Parent = ring
+
+		rings[i] = ring
+	end
+
+	local logo = Instance.new("TextLabel")
+	logo.AnchorPoint = Vector2.new(0.5, 0.5)
+	logo.Position = UDim2.fromScale(0.5, 0.43)
+	logo.Size = UDim2.fromScale(0.62, 0.14)
+	logo.BackgroundTransparency = 1
+	logo.Text = "BOOSTLAB"
+	logo.Font = Enum.Font.GothamBlack
+	logo.TextScaled = true
+	logo.TextColor3 = Color3.fromRGB(250, 241, 255)
+	logo.TextStrokeColor3 = Color3.fromRGB(154, 45, 235)
+	logo.TextStrokeTransparency = 0.25
+	logo.TextTransparency = 1
+	logo.Parent = root
+
+	local sub = Instance.new("TextLabel")
+	sub.AnchorPoint = Vector2.new(0.5, 0.5)
+	sub.Position = UDim2.fromScale(0.5, 0.535)
+	sub.Size = UDim2.fromScale(0.55, 0.045)
+	sub.BackgroundTransparency = 1
+	sub.Text = "INITIALIZING  •  FLY SCRIPT"
+	sub.Font = Enum.Font.GothamMedium
+	sub.TextScaled = true
+	sub.TextColor3 = Color3.fromRGB(205, 177, 225)
+	sub.TextTransparency = 1
+	sub.Parent = root
+
+	local status = Instance.new("TextLabel")
+	status.AnchorPoint = Vector2.new(0.5, 0.5)
+	status.Position = UDim2.fromScale(0.5, 0.59)
+	status.Size = UDim2.fromScale(0.5, 0.035)
+	status.BackgroundTransparency = 1
+	status.Text = "Loading modules..."
+	status.Font = Enum.Font.Gotham
+	status.TextScaled = true
+	status.TextColor3 = Color3.fromRGB(167, 133, 190)
+	status.TextTransparency = 1
+	status.Parent = root
+
+	local track = Instance.new("Frame")
+	track.AnchorPoint = Vector2.new(0.5, 0.5)
+	track.Position = UDim2.fromScale(0.5, 0.67)
+	track.Size = UDim2.fromScale(0.34, 0.009)
+	track.BackgroundColor3 = Color3.fromRGB(45, 25, 58)
+	track.BackgroundTransparency = 0.2
+	track.BorderSizePixel = 0
+	track.Parent = root
+
+	local trackCorner = Instance.new("UICorner")
+	trackCorner.CornerRadius = UDim.new(1, 0)
+	trackCorner.Parent = track
+
+	local fill = Instance.new("Frame")
+	fill.Size = UDim2.new(0, 0, 1, 0)
+	fill.BackgroundColor3 = Color3.fromRGB(196, 76, 255)
+	fill.BorderSizePixel = 0
+	fill.Parent = track
+
+	local fillCorner = Instance.new("UICorner")
+	fillCorner.CornerRadius = UDim.new(1, 0)
+	fillCorner.Parent = fill
+
+	local percent = Instance.new("TextLabel")
+	percent.AnchorPoint = Vector2.new(0.5, 0.5)
+	percent.Position = UDim2.fromScale(0.5, 0.705)
+	percent.Size = UDim2.fromScale(0.12, 0.03)
+	percent.BackgroundTransparency = 1
+	percent.Text = "0%"
+	percent.Font = Enum.Font.GothamBold
+	percent.TextScaled = true
+	percent.TextColor3 = Color3.fromRGB(210, 180, 235)
+	percent.TextTransparency = 1
+	percent.Parent = root
+
+	local statuses = {
+		"Loading modules...",
+		"Preparing visuals...",
+		"Preparing movement...",
+		"Preparing controls...",
+		"BoostLab ready."
+	}
+
+	TweenService:Create(
+		glowScale,
+		TweenInfo.new(1.2, Enum.EasingStyle.Quint, Enum.EasingDirection.Out),
+		{Scale = 1.35}
+	):Play()
+
+	TweenService:Create(
+		logo,
+		TweenInfo.new(0.7, Enum.EasingStyle.Back, Enum.EasingDirection.Out),
+		{TextTransparency = 0}
+	):Play()
+
+	task.spawn(function()
+		while logo.Parent do
+			TweenService:Create(
+				logo,
+				TweenInfo.new(0.9, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut),
+				{
+					TextStrokeTransparency = 0.05,
+					TextTransparency = 0.02
+				}
+			):Play()
+
+			task.wait(0.9)
+
+			TweenService:Create(
+				logo,
+				TweenInfo.new(0.9, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut),
+				{
+					TextStrokeTransparency = 0.45,
+					TextTransparency = 0.08
+				}
+			):Play()
+
+			task.wait(0.9)
+		end
+	end)
+
+	task.delay(0.18, function()
+		TweenService:Create(
+			sub,
+			TweenInfo.new(0.55),
+			{TextTransparency = 0.15}
+		):Play()
+	end)
+
+	task.delay(0.3, function()
+		TweenService:Create(
+			status,
+			TweenInfo.new(0.45),
+			{TextTransparency = 0.2}
+		):Play()
+
+		TweenService:Create(
+			percent,
+			TweenInfo.new(0.45),
+			{TextTransparency = 0.1}
+		):Play()
+	end)
+
+	for i, ring in ipairs(rings) do
+		task.spawn(function()
+			local direction = (i % 2 == 0) and 1 or -1
+			local rotationTime = 2.2 + i * 0.35
+
+			while ring.Parent do
+				TweenService:Create(
+					ring,
+					TweenInfo.new(
+						rotationTime,
+						Enum.EasingStyle.Linear
+					),
+					{
+						Rotation = ring.Rotation + 360 * direction
+					}
+				):Play()
+
+				task.wait(rotationTime)
+			end
+		end)
+	end
+
+	local duration = 2.8
+	local start = os.clock()
+
+	while true do
+		local alpha = math.clamp(
+			(os.clock() - start) / duration,
+			0,
+			1
+		)
+
+		local eased = 1 - (1 - alpha)^3
+
+		fill.Size = UDim2.new(eased, 0, 1, 0)
+
+		percent.Text = string.format(
+			"%d%%",
+			math.floor(eased * 100 + 0.5)
+		)
+
+		status.Text = statuses[
+			math.clamp(
+				math.floor(alpha * #statuses) + 1,
+				1,
+				#statuses
+			)
+		]
+
+		if alpha >= 1 then
+			break
+		end
+
+		RunService.RenderStepped:Wait()
+	end
+
+	task.wait(0.18)
+
+	TweenService:Create(
+		root,
+		TweenInfo.new(0.6, Enum.EasingStyle.Quad, Enum.EasingDirection.In),
+		{BackgroundTransparency = 1}
+	):Play()
+
+	TweenService:Create(
+		logo,
+		TweenInfo.new(0.45),
+		{
+			TextTransparency = 1,
+			TextStrokeTransparency = 1
+		}
+	):Play()
+
+	TweenService:Create(
+		sub,
+		TweenInfo.new(0.35),
+		{TextTransparency = 1}
+	):Play()
+
+	TweenService:Create(
+		status,
+		TweenInfo.new(0.25),
+		{TextTransparency = 1}
+	):Play()
+
+	TweenService:Create(
+		percent,
+		TweenInfo.new(0.25),
+		{TextTransparency = 1}
+	):Play()
+
+	TweenService:Create(
+		track,
+		TweenInfo.new(0.3),
+		{BackgroundTransparency = 1}
+	):Play()
+
+	TweenService:Create(
+		glow,
+		TweenInfo.new(0.5),
+		{BackgroundTransparency = 1}
+	):Play()
+
+	task.wait(0.65)
+	gui:Destroy()
+end
+
+-- ============================================================
+-- FLY SYSTEM
+-- Für Roblox Studio / eigenes Spiel
+-- ============================================================
+
+local FlyEnabled = false
+local FlySpeed = 60
+local FlyConnection
+local BodyVelocity
+local BodyGyro
+
+local function stopFly()
+	FlyEnabled = false
+
+	if FlyConnection then
+		FlyConnection:Disconnect()
+		FlyConnection = nil
+	end
+
+	if BodyVelocity then
+		BodyVelocity:Destroy()
+		BodyVelocity = nil
+	end
+
+	if BodyGyro then
+		BodyGyro:Destroy()
+		BodyGyro = nil
+	end
+
+	local character = LocalPlayer.Character
+	if character then
+		local humanoid = character:FindFirstChildOfClass("Humanoid")
+
+		if humanoid then
+			humanoid.PlatformStand = false
+		end
+	end
+end
+
+local function startFly()
+	stopFly()
+
+	local character = LocalPlayer.Character or
+		LocalPlayer.CharacterAdded:Wait()
+
+	local humanoid = character:WaitForChild("Humanoid")
+	local rootPart = character:WaitForChild("HumanoidRootPart")
+
+	FlyEnabled = true
+
+	BodyVelocity = Instance.new("BodyVelocity")
+	BodyVelocity.MaxForce = Vector3.new(
+		math.huge,
+		math.huge,
+		math.huge
+	)
+	BodyVelocity.Velocity = Vector3.zero
+	BodyVelocity.Parent = rootPart
+
+	BodyGyro = Instance.new("BodyGyro")
+	BodyGyro.MaxTorque = Vector3.new(
+		math.huge,
+		math.huge,
+		math.huge
+	)
+	BodyGyro.P = 90000
+	BodyGyro.D = 1000
+	BodyGyro.CFrame = workspace.CurrentCamera.CFrame
+	BodyGyro.Parent = rootPart
+
+	humanoid.PlatformStand = true
+
+	FlyConnection = RunService.RenderStepped:Connect(function()
+		if not FlyEnabled then
+			return
+		end
+
+		if not character.Parent or
+			humanoid.Health <= 0 then
+			stopFly()
+			return
+		end
+
+		local camera = workspace.CurrentCamera
+		local moveDirection = Vector3.zero
+
+		if UserInputService:IsKeyDown(Enum.KeyCode.W) then
+			moveDirection += camera.CFrame.LookVector
+		end
+
+		if UserInputService:IsKeyDown(Enum.KeyCode.S) then
+			moveDirection -= camera.CFrame.LookVector
+		end
+
+		if UserInputService:IsKeyDown(Enum.KeyCode.A) then
+			moveDirection -= camera.CFrame.RightVector
+		end
+
+		if UserInputService:IsKeyDown(Enum.KeyCode.D) then
+			moveDirection += camera.CFrame.RightVector
+		end
+
+		if UserInputService:IsKeyDown(Enum.KeyCode.Space) then
+			moveDirection += Vector3.new(0, 1, 0)
+		end
+
+		if UserInputService:IsKeyDown(Enum.KeyCode.LeftControl) then
+			moveDirection -= Vector3.new(0, 1, 0)
+		end
+
+		if moveDirection.Magnitude > 0 then
+			moveDirection = moveDirection.Unit
+		end
+
+		BodyVelocity.Velocity = moveDirection * FlySpeed
+		BodyGyro.CFrame = camera.CFrame
+	end)
+end
+
+-- ============================================================
+-- RAYFIELD-STYLE UI
+-- ============================================================
+
+local function createUI()
+	local playerGui = LocalPlayer:WaitForChild("PlayerGui")
+
+	local old = playerGui:FindFirstChild("BoostLabFly")
+	if old then
+		old:Destroy()
+	end
+
+	local gui = Instance.new("ScreenGui")
+	gui.Name = "BoostLabFly"
+	gui.ResetOnSpawn = false
+	gui.DisplayOrder = 100
+	gui.Parent = playerGui
+
+	local main = Instance.new("Frame")
+	main.Size = UDim2.fromOffset(390, 270)
+	main.Position = UDim2.new(0.5, -195, 0.5, -135)
+	main.BackgroundColor3 = Color3.fromRGB(13, 10, 19)
+	main.BorderSizePixel = 0
+	main.Parent = gui
+
+	local corner = Instance.new("UICorner")
+	corner.CornerRadius = UDim.new(0, 10)
+	corner.Parent = main
+
+	local stroke = Instance.new("UIStroke")
+	stroke.Color = Color3.fromRGB(105, 45, 145)
+	stroke.Thickness = 1
+	stroke.Transparency = 0.35
+	stroke.Parent = main
+
+	-- Top bar
+	local top = Instance.new("Frame")
+	top.Size = UDim2.new(1, 0, 0, 58)
+	top.BackgroundColor3 = Color3.fromRGB(18, 13, 27)
+	top.BorderSizePixel = 0
+	top.Parent = main
+
+	local topCorner = Instance.new("UICorner")
+	topCorner.CornerRadius = UDim.new(0, 10)
+	topCorner.Parent = top
+
+	local title = Instance.new("TextLabel")
+	title.Position = UDim2.fromOffset(18, 8)
+	title.Size = UDim2.new(1, -70, 0, 25)
+	title.BackgroundTransparency = 1
+	title.Text = "BoostLab"
+	title.Font = Enum.Font.GothamBold
+	title.TextSize = 20
+	title.TextXAlignment = Enum.TextXAlignment.Left
+	title.TextColor3 = Color3.fromRGB(245, 235, 255)
+	title.Parent = top
+
+	local subtitle = Instance.new("TextLabel")
+	subtitle.Position = UDim2.fromOffset(19, 33)
+	subtitle.Size = UDim2.new(1, -70, 0, 18)
+	subtitle.BackgroundTransparency = 1
+	subtitle.Text = "Fly • Movement"
+	subtitle.Font = Enum.Font.Gotham
+	subtitle.TextSize = 12
+	subtitle.TextXAlignment = Enum.TextXAlignment.Left
+	subtitle.TextColor3 = Color3.fromRGB(160, 135, 180)
+	subtitle.Parent = top
+
+	-- Close
+	local close = Instance.new("TextButton")
+	close.Position = UDim2.new(1, -42, 0, 15)
+	close.Size = UDim2.fromOffset(27, 27)
+	close.BackgroundColor3 = Color3.fromRGB(35, 25, 43)
+	close.Text = "×"
+	close.TextSize = 19
+	close.Font = Enum.Font.GothamBold
+	close.TextColor3 = Color3.fromRGB(220, 200, 230)
+	close.BorderSizePixel = 0
+	close.Parent = top
+
+	local closeCorner = Instance.new("UICorner")
+	closeCorner.CornerRadius = UDim.new(0, 7)
+	closeCorner.Parent = close
+
+	close.MouseButton1Click:Connect(function()
+		stopFly()
+		gui:Destroy()
+	end)
+
+	-- Fly label
+	local flyLabel = Instance.new("TextLabel")
+	flyLabel.Position = UDim2.fromOffset(20, 80)
+	flyLabel.Size = UDim2.new(1, -100, 0, 25)
+	flyLabel.BackgroundTransparency = 1
+	flyLabel.Text = "Fly"
+	flyLabel.Font = Enum.Font.GothamSemibold
+	flyLabel.TextSize = 16
+	flyLabel.TextXAlignment = Enum.TextXAlignment.Left
+	flyLabel.TextColor3 = Color3.fromRGB(235, 225, 240)
+	flyLabel.Parent = main
+
+	local flyInfo = Instance.new("TextLabel")
+	flyInfo.Position = UDim2.fromOffset(20, 103)
+	flyInfo.Size = UDim2.new(1, -120, 0, 20)
+	flyInfo.BackgroundTransparency = 1
+	flyInfo.Text = "WASD + Space / Ctrl"
+	flyInfo.Font = Enum.Font.Gotham
+	flyInfo.TextSize = 11
+	flyInfo.TextXAlignment = Enum.TextXAlignment.Left
+	flyInfo.TextColor3 = Color3.fromRGB(145, 125, 160)
+	flyInfo.Parent = main
+
+	-- Toggle
+	local toggle = Instance.new("TextButton")
+	toggle.Position = UDim2.new(1, -82, 0, 83)
+	toggle.Size = UDim2.fromOffset(58, 28)
+	toggle.BackgroundColor3 = Color3.fromRGB(55, 42, 62)
+	toggle.Text = "OFF"
+	toggle.Font = Enum.Font.GothamBold
+	toggle.TextSize = 11
+	toggle.TextColor3 = Color3.fromRGB(180, 165, 190)
+	toggle.BorderSizePixel = 0
+	toggle.Parent = main
+
+	local toggleCorner = Instance.new("UICorner")
+	toggleCorner.CornerRadius = UDim.new(1, 0)
+	toggleCorner.Parent = toggle
+
+	-- Speed label
+	local speedLabel = Instance.new("TextLabel")
+	speedLabel.Position = UDim2.fromOffset(20, 145)
+	speedLabel.Size = UDim2.new(1, -40, 0, 24)
+	speedLabel.BackgroundTransparency = 1
+	speedLabel.Text = "Fly Speed: 60"
+	speedLabel.Font = Enum.Font.GothamSemibold
+	speedLabel.TextSize = 14
+	speedLabel.TextXAlignment = Enum.TextXAlignment.Left
+	speedLabel.TextColor3 = Color3.fromRGB(225, 215, 235)
+	speedLabel.Parent = main
+
+	-- Slider
+	local slider = Instance.new("TextButton")
+	slider.Position = UDim2.fromOffset(20, 180)
+	slider.Size = UDim2.new(1, -40, 0, 7)
+	slider.BackgroundColor3 = Color3.fromRGB(45, 35, 53)
+	slider.Text = ""
+	slider.BorderSizePixel = 0
+	slider.AutoButtonColor = false
+	slider.Parent = main
+
+	local sliderCorner = Instance.new("UICorner")
+	sliderCorner.CornerRadius = UDim.new(1, 0)
+	sliderCorner.Parent = slider
+
+	local sliderFill = Instance.new("Frame")
+	sliderFill.Size = UDim2.new(
+		(FlySpeed - 10) / 190,
+		0,
+		1,
+		0
+	)
+	sliderFill.BackgroundColor3 = Color3.fromRGB(175, 65, 235)
+	sliderFill.BorderSizePixel = 0
+	sliderFill.Parent = slider
+
+	local fillCorner2 = Instance.new("UICorner")
+	fillCorner2.CornerRadius = UDim.new(1, 0)
+	fillCorner2.Parent = sliderFill
+
+	local dragging = false
+
+	local function updateSlider(x)
+		local relative = math.clamp(
+			(x - slider.AbsolutePosition.X) /
+			slider.AbsoluteSize.X,
+			0,
+			1
+		)
+
+		FlySpeed = math.floor(10 + relative * 190)
+
+		sliderFill.Size = UDim2.new(
+			relative,
+			0,
+			1,
+			0
+		)
+
+		speedLabel.Text = "Fly Speed: " .. FlySpeed
+	end
+
+	slider.MouseButton1Down:Connect(function(x)
+		dragging = true
+		updateSlider(x)
+	end)
+
+	UserInputService.InputChanged:Connect(function(input)
+		if dragging and
+			input.UserInputType == Enum.UserInputType.MouseMovement then
+
+			updateSlider(input.Position.X)
+		end
+	end)
+
+	UserInputService.InputEnded:Connect(function(input)
+		if input.UserInputType == Enum.UserInputType.MouseButton1 then
+			dragging = false
+		end
+	end)
+
+	-- Status
+	local status = Instance.new("TextLabel")
+	status.Position = UDim2.fromOffset(20, 210)
+	status.Size = UDim2.new(1, -40, 0, 30)
+	status.BackgroundTransparency = 1
+	status.Text = "● Fly disabled"
+	status.Font = Enum.Font.Gotham
+	status.TextSize = 12
+	status.TextXAlignment = Enum.TextXAlignment.Left
+	status.TextColor3 = Color3.fromRGB(145, 125, 160)
+	status.Parent = main
+
+	-- Toggle function
+	toggle.MouseButton1Click:Connect(function()
+		if FlyEnabled then
+			stopFly()
+
+			toggle.Text = "OFF"
+			toggle.BackgroundColor3 = Color3.fromRGB(55, 42, 62)
+			toggle.TextColor3 = Color3.fromRGB(180, 165, 190)
+
+			status.Text = "● Fly disabled"
+			status.TextColor3 = Color3.fromRGB(145, 125, 160)
+		else
+			startFly()
+
+			toggle.Text = "ON"
+			toggle.BackgroundColor3 = Color3.fromRGB(145, 50, 195)
+			toggle.TextColor3 = Color3.fromRGB(255, 245, 255)
+
+			status.Text = "● Fly enabled"
+			status.TextColor3 = Color3.fromRGB(210, 150, 240)
+		end
+	end)
+
+	-- Dragging
+	local draggingWindow = false
+	local dragStart
+	local startPosition
+
+	top.InputBegan:Connect(function(input)
+		if input.UserInputType == Enum.UserInputType.MouseButton1 then
+			draggingWindow = true
+			dragStart = input.Position
+			startPosition = main.Position
+		end
+	end)
+
+	top.InputEnded:Connect(function(input)
+		if input.UserInputType == Enum.UserInputType.MouseButton1 then
+			draggingWindow = false
+		end
+	end)
+
+	UserInputService.InputChanged:Connect(function(input)
+		if draggingWindow and
+			input.UserInputType == Enum.UserInputType.MouseMovement then
+
+			local delta = input.Position - dragStart
+
+			main.Position = UDim2.new(
+				startPosition.X.Scale,
+				startPosition.X.Offset + delta.X,
+				startPosition.Y.Scale,
+				startPosition.Y.Offset + delta.Y
+			)
+		end
+	end)
+end
+
+-- ============================================================
+-- START
+-- ============================================================
+
+playIntro()
+createUI()
+
+-- Stop Fly when character dies
+LocalPlayer.CharacterAdded:Connect(function()
+	if FlyEnabled then
+		stopFly()
+	end
+end)
