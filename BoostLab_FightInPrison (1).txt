@@ -1,0 +1,2025 @@
+--[[
+    BoostLab Boxing Hub
+    Fight in Prison focused boxing-game client toolkit
+    Rayfield UI + BoostLab intro
+
+    Notes:
+    - Designed as a generic client-side hub; game-specific remotes/anticheat systems
+      are intentionally not hard-coded because every boxing game uses different APIs.
+    - Combat Assist is tuned for close-range boxing and can optionally perform mouse clicks when a target is inside the configured punch range.
+]]
+
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
+local TweenService = game:GetService("TweenService")
+local Lighting = game:GetService("Lighting")
+local LocalPlayer = Players.LocalPlayer
+
+local function notify(title, content, duration)
+    pcall(function()
+        Rayfield:Notify({
+            Title = title,
+            Content = content or "",
+            Duration = duration or 2.5
+        })
+    end)
+end
+
+local function getCharacter(player)
+    player = player or LocalPlayer
+    return player.Character
+end
+
+local function getHumanoid(player)
+    local char = getCharacter(player)
+    return char and char:FindFirstChildOfClass("Humanoid")
+end
+
+local function getRoot(player)
+    local char = getCharacter(player)
+    return char and char:FindFirstChild("HumanoidRootPart")
+end
+
+local function getTargetPart(model, preferred)
+    if not model then return nil end
+    local candidates = {}
+    if preferred == "Head" then
+        candidates = { "Head", "UpperTorso", "Torso", "HumanoidRootPart" }
+    elseif preferred == "UpperTorso" then
+        candidates = { "UpperTorso", "Torso", "Head", "HumanoidRootPart" }
+    elseif preferred == "Torso" then
+        candidates = { "Torso", "UpperTorso", "HumanoidRootPart", "Head" }
+    else
+        candidates = { "HumanoidRootPart", "UpperTorso", "Torso", "Head" }
+    end
+    for _, name in ipairs(candidates) do
+        local part = model:FindFirstChild(name)
+        if part and part:IsA("BasePart") then
+            return part
+        end
+    end
+    return nil
+end
+
+-- ============================================================
+-- BOOSTLAB INTRO
+-- ============================================================
+local function playIntro()
+    local playerGui = LocalPlayer:WaitForChild("PlayerGui")
+    local old = playerGui:FindFirstChild("BoostLabIntro")
+    if old then old:Destroy() end
+
+    local gui = Instance.new("ScreenGui")
+    gui.Name = "BoostLabIntro"
+    gui.IgnoreGuiInset = true
+    gui.ResetOnSpawn = false
+    gui.DisplayOrder = 100000
+    gui.Parent = playerGui
+
+    local root = Instance.new("Frame")
+    root.Size = UDim2.fromScale(1, 1)
+    root.BackgroundColor3 = Color3.fromRGB(5, 5, 8)
+    root.BorderSizePixel = 0
+    root.Parent = gui
+
+    local gradient = Instance.new("UIGradient")
+    gradient.Color = ColorSequence.new({
+        ColorSequenceKeypoint.new(0, Color3.fromRGB(5, 4, 8)),
+        ColorSequenceKeypoint.new(0.5, Color3.fromRGB(23, 9, 39)),
+        ColorSequenceKeypoint.new(1, Color3.fromRGB(4, 4, 8)),
+    })
+    gradient.Rotation = 32
+    gradient.Parent = root
+
+    local vignette = Instance.new("Frame")
+    vignette.Size = UDim2.fromScale(1, 1)
+    vignette.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+    vignette.BackgroundTransparency = 0.42
+    vignette.BorderSizePixel = 0
+    vignette.Parent = root
+
+    local pulse = Instance.new("Frame")
+    pulse.AnchorPoint = Vector2.new(0.5, 0.5)
+    pulse.Position = UDim2.fromScale(0.5, 0.42)
+    pulse.Size = UDim2.fromScale(0.18, 0.18)
+    pulse.BackgroundColor3 = Color3.fromRGB(120, 45, 255)
+    pulse.BackgroundTransparency = 0.76
+    pulse.BorderSizePixel = 0
+    pulse.Parent = root
+    local pulseCorner = Instance.new("UICorner")
+    pulseCorner.CornerRadius = UDim.new(1, 0)
+    pulseCorner.Parent = pulse
+    local pulseScale = Instance.new("UIScale")
+    pulseScale.Scale = 0.5
+    pulseScale.Parent = pulse
+
+    local rings = {}
+    for i = 1, 4 do
+        local ring = Instance.new("Frame")
+        ring.AnchorPoint = Vector2.new(0.5, 0.5)
+        ring.Position = UDim2.fromScale(0.5, 0.42)
+        ring.Size = UDim2.fromScale(0.16 + i * 0.045, 0.16 + i * 0.045)
+        ring.BackgroundTransparency = 1
+        ring.BorderSizePixel = 0
+        ring.Parent = root
+
+        local stroke = Instance.new("UIStroke")
+        stroke.Color = Color3.fromRGB(146, 71, 255)
+        stroke.Thickness = 1 + (i == 1 and 1 or 0)
+        stroke.Transparency = 0.35 + i * 0.12
+        stroke.Parent = ring
+
+        local corner = Instance.new("UICorner")
+        corner.CornerRadius = UDim.new(1, 0)
+        corner.Parent = ring
+        rings[i] = ring
+    end
+
+    local logo = Instance.new("TextLabel")
+    logo.AnchorPoint = Vector2.new(0.5, 0.5)
+    logo.Position = UDim2.fromScale(0.5, 0.42)
+    logo.Size = UDim2.fromScale(0.62, 0.13)
+    logo.BackgroundTransparency = 1
+    logo.Text = "BOOSTLAB"
+    logo.Font = Enum.Font.GothamBlack
+    logo.TextScaled = true
+    logo.TextColor3 = Color3.fromRGB(245, 240, 255)
+    logo.TextStrokeColor3 = Color3.fromRGB(125, 65, 255)
+    logo.TextStrokeTransparency = 1
+    logo.TextTransparency = 1
+    logo.Parent = root
+
+    local subtitle = Instance.new("TextLabel")
+    subtitle.AnchorPoint = Vector2.new(0.5, 0.5)
+    subtitle.Position = UDim2.fromScale(0.5, 0.525)
+    subtitle.Size = UDim2.fromScale(0.58, 0.04)
+    subtitle.BackgroundTransparency = 1
+    subtitle.Text = "BOXING HUB  •  COMBAT SUITE"
+    subtitle.Font = Enum.Font.GothamMedium
+    subtitle.TextScaled = true
+    subtitle.TextColor3 = Color3.fromRGB(193, 173, 214)
+    subtitle.TextTransparency = 1
+    subtitle.Parent = root
+
+    local status = Instance.new("TextLabel")
+    status.AnchorPoint = Vector2.new(0.5, 0.5)
+    status.Position = UDim2.fromScale(0.5, 0.585)
+    status.Size = UDim2.fromScale(0.55, 0.035)
+    status.BackgroundTransparency = 1
+    status.Text = "Calibrating target system..."
+    status.Font = Enum.Font.Gotham
+    status.TextScaled = true
+    status.TextColor3 = Color3.fromRGB(143, 119, 166)
+    status.TextTransparency = 1
+    status.Parent = root
+
+    local track = Instance.new("Frame")
+    track.AnchorPoint = Vector2.new(0.5, 0.5)
+    track.Position = UDim2.fromScale(0.5, 0.665)
+    track.Size = UDim2.fromScale(0.35, 0.009)
+    track.BackgroundColor3 = Color3.fromRGB(43, 31, 53)
+    track.BorderSizePixel = 0
+    track.Parent = root
+    local trackCorner = Instance.new("UICorner")
+    trackCorner.CornerRadius = UDim.new(1, 0)
+    trackCorner.Parent = track
+
+    local fill = Instance.new("Frame")
+    fill.Size = UDim2.new(0, 0, 1, 0)
+    fill.BackgroundColor3 = Color3.fromRGB(149, 73, 255)
+    fill.BorderSizePixel = 0
+    fill.Parent = track
+    local fillCorner = Instance.new("UICorner")
+    fillCorner.CornerRadius = UDim.new(1, 0)
+    fillCorner.Parent = fill
+
+    local percent = Instance.new("TextLabel")
+    percent.AnchorPoint = Vector2.new(0.5, 0.5)
+    percent.Position = UDim2.fromScale(0.5, 0.705)
+    percent.Size = UDim2.fromScale(0.1, 0.03)
+    percent.BackgroundTransparency = 1
+    percent.Text = "0%"
+    percent.Font = Enum.Font.GothamBold
+    percent.TextScaled = true
+    percent.TextColor3 = Color3.fromRGB(200, 183, 223)
+    percent.TextTransparency = 1
+    percent.Parent = root
+
+    local statuses = {
+        "Calibrating target system...",
+        "Preparing boxing visuals...",
+        "Loading combat controls...",
+        "Preparing movement tools...",
+        "BoostLab Boxing Hub ready."
+    }
+
+    TweenService:Create(pulseScale, TweenInfo.new(1.2, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), { Scale = 1.35 }):Play()
+    TweenService:Create(logo, TweenInfo.new(0.7, Enum.EasingStyle.Back, Enum.EasingDirection.Out), { TextTransparency = 0, TextStrokeTransparency = 0.22 }):Play()
+    task.delay(0.2, function()
+        TweenService:Create(subtitle, TweenInfo.new(0.5), { TextTransparency = 0.12 }):Play()
+    end)
+    task.delay(0.32, function()
+        TweenService:Create(status, TweenInfo.new(0.4), { TextTransparency = 0.18 }):Play()
+        TweenService:Create(percent, TweenInfo.new(0.4), { TextTransparency = 0.05 }):Play()
+    end)
+
+    for i, ring in ipairs(rings) do
+        task.spawn(function()
+            local direction = (i % 2 == 0) and 1 or -1
+            while ring.Parent do
+                TweenService:Create(ring, TweenInfo.new(2.1 + i * 0.35, Enum.EasingStyle.Linear), {
+                    Rotation = ring.Rotation + direction * 360
+                }):Play()
+                task.wait(2.1 + i * 0.35)
+            end
+        end)
+    end
+
+    local duration = 2.5
+    local startTime = os.clock()
+    while true do
+        local alpha = math.clamp((os.clock() - startTime) / duration, 0, 1)
+        local eased = 1 - (1 - alpha) ^ 3
+        fill.Size = UDim2.new(eased, 0, 1, 0)
+        percent.Text = string.format("%d%%", math.floor(eased * 100 + 0.5))
+        status.Text = statuses[math.clamp(math.floor(alpha * #statuses) + 1, 1, #statuses)]
+        if alpha >= 1 then break end
+        RunService.RenderStepped:Wait()
+    end
+
+    task.wait(0.18)
+    TweenService:Create(root, TweenInfo.new(0.55, Enum.EasingStyle.Quad, Enum.EasingDirection.In), { BackgroundTransparency = 1 }):Play()
+    TweenService:Create(vignette, TweenInfo.new(0.4), { BackgroundTransparency = 1 }):Play()
+    TweenService:Create(logo, TweenInfo.new(0.4), { TextTransparency = 1, TextStrokeTransparency = 1 }):Play()
+    TweenService:Create(subtitle, TweenInfo.new(0.32), { TextTransparency = 1 }):Play()
+    TweenService:Create(status, TweenInfo.new(0.25), { TextTransparency = 1 }):Play()
+    TweenService:Create(percent, TweenInfo.new(0.25), { TextTransparency = 1 }):Play()
+    TweenService:Create(track, TweenInfo.new(0.25), { BackgroundTransparency = 1 }):Play()
+    TweenService:Create(pulse, TweenInfo.new(0.45), { BackgroundTransparency = 1 }):Play()
+    task.wait(0.6)
+    gui:Destroy()
+end
+
+playIntro()
+
+-- ============================================================
+-- RAYFIELD
+-- ============================================================
+local Rayfield = loadstring(game:HttpGet("https://sirius.menu/rayfield"))()
+
+local Window = Rayfield:CreateWindow({
+    Name = "BoostLab Boxing Hub",
+    LoadingTitle = "BoostLab Boxing Hub",
+    LoadingSubtitle = "Combat • Visuals • Movement",
+    ConfigurationSaving = {
+        Enabled = true,
+        FolderName = "BoostLabBoxing",
+        FileName = "Settings"
+    },
+})
+
+local CombatTab = Window:CreateTab("Combat", 4483362458)
+local VisualsTab = Window:CreateTab("Visuals", 4483362458)
+local MovementTab = Window:CreateTab("Movement", 4483362458)
+local UtilityTab = Window:CreateTab("Utility", 4483362458)
+local AutoFarmTab = Window:CreateTab("Auto Farm", 4483362458)
+
+-- ============================================================
+-- ============================================================
+-- COMBAT / BOXING TARGET SYSTEM - Fight in Prison
+-- ============================================================
+CombatTab:CreateParagraph({
+    Title = "Fight in Prison Combat",
+    Content = "Close-range target lock, stronger prediction, smart punch timing, auto-kill and orbit movement."
+})
+CombatTab:CreateSection("Targeting")
+
+local teamCheck = true
+local combatEnabled = false
+local faceTargetEnabled = true
+local cameraAimEnabled = true
+local highlightTargetEnabled = true
+local autoSwitch = true
+local targetPartName = "UpperTorso"
+local targetPriority = "Smart"
+local screenFov = 280
+local maxTargetDistance = 90
+local aimStrength = 0.92
+local predictionTime = 0.10
+local targetStickiness = 45
+local requireLineOfSight = false
+
+local currentTargetPart = nil
+local lastTargetSwitch = 0
+local targetSwitchDelay = 0.08
+
+local fovIndicatorEnabled = true
+local fovIndicator = Instance.new("Frame")
+fovIndicator.Name = "BoostLabBoxingFOV"
+fovIndicator.AnchorPoint = Vector2.new(0.5, 0.5)
+fovIndicator.Position = UDim2.fromScale(0.5, 0.5)
+fovIndicator.Size = UDim2.fromOffset(screenFov * 2, screenFov * 2)
+fovIndicator.BackgroundTransparency = 1
+fovIndicator.BorderSizePixel = 0
+fovIndicator.Visible = false
+fovIndicator.Parent = LocalPlayer:WaitForChild("PlayerGui")
+local fovCorner = Instance.new("UICorner")
+fovCorner.CornerRadius = UDim.new(1, 0)
+fovCorner.Parent = fovIndicator
+local fovStroke = Instance.new("UIStroke")
+fovStroke.Color = Color3.fromRGB(154, 68, 255)
+fovStroke.Thickness = 1.5
+fovStroke.Transparency = 0.2
+fovStroke.Parent = fovIndicator
+
+local targetHighlight = Instance.new("Highlight")
+targetHighlight.Name = "BoostLabTarget"
+targetHighlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+targetHighlight.FillColor = Color3.fromRGB(154, 68, 255)
+targetHighlight.OutlineColor = Color3.fromRGB(240, 230, 255)
+targetHighlight.FillTransparency = 0.78
+targetHighlight.OutlineTransparency = 0.05
+targetHighlight.Enabled = false
+targetHighlight.Parent = workspace
+
+local hitConfirmEnabled = true
+local hitConfirmGui = nil
+local recentAttackTime = 0
+local recentAttackTarget = nil
+local lastKnownHealth = {}
+
+local function showHitConfirm(damage)
+    local gui = LocalPlayer:FindFirstChildOfClass("PlayerGui")
+    if not gui then return end
+    if hitConfirmGui then hitConfirmGui:Destroy() end
+
+    local label = Instance.new("TextLabel")
+    label.Name = "BoostLabHitConfirm"
+    label.AnchorPoint = Vector2.new(0.5, 0.5)
+    label.Position = UDim2.fromScale(0.5, 0.42)
+    label.Size = UDim2.fromOffset(220, 58)
+    label.BackgroundTransparency = 1
+    label.Text = damage and ("HIT  -" .. math.max(1, math.floor(damage))) or "HIT"
+    label.Font = Enum.Font.GothamBlack
+    label.TextScaled = true
+    label.TextColor3 = Color3.fromRGB(194, 102, 255)
+    label.TextStrokeColor3 = Color3.fromRGB(40, 10, 55)
+    label.TextStrokeTransparency = 0.1
+    label.Parent = gui
+    hitConfirmGui = label
+
+    TweenService:Create(label, TweenInfo.new(0.10, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
+        Position = UDim2.fromScale(0.5, 0.38),
+    }):Play()
+    task.delay(0.10, function()
+        if label.Parent then
+            local tw = TweenService:Create(label, TweenInfo.new(0.24), {
+                TextTransparency = 1,
+                TextStrokeTransparency = 1,
+                Position = UDim2.fromScale(0.5, 0.34),
+            })
+            tw:Play()
+            tw.Completed:Wait()
+            if label.Parent then label:Destroy() end
+        end
+        if hitConfirmGui == label then hitConfirmGui = nil end
+    end)
+end
+
+local function monitorTargetHealth(player, humanoid)
+    if not humanoid or humanoid:GetAttribute("BoostLabHealthMonitor") then return end
+    humanoid:SetAttribute("BoostLabHealthMonitor", true)
+    local oldHealth = humanoid.Health
+    humanoid.HealthChanged:Connect(function(newHealth)
+        if hitConfirmEnabled and newHealth < oldHealth then
+            local now = os.clock()
+            if now - recentAttackTime <= 0.65 and recentAttackTarget == player then
+                showHitConfirm(oldHealth - newHealth)
+            end
+        end
+        oldHealth = newHealth
+        lastKnownHealth[player] = newHealth
+    end)
+end
+
+local function isSameTeam(player)
+    if not teamCheck then return false end
+    if not LocalPlayer.Team or not player.Team then return false end
+    return LocalPlayer.Team == player.Team
+end
+
+local function getPredictedPosition(part)
+    if not part then return nil end
+    local velocity = part.AssemblyLinearVelocity or Vector3.zero
+    return part.Position + velocity * predictionTime
+end
+
+local function hasLineOfSight(origin, targetPart, targetCharacter)
+    if not requireLineOfSight then return true end
+    if not targetPart or not targetCharacter then return false end
+    local direction = targetPart.Position - origin
+    if direction.Magnitude <= 0.05 then return true end
+    local params = RaycastParams.new()
+    params.FilterType = Enum.RaycastFilterType.Exclude
+    params.FilterDescendantsInstances = { LocalPlayer.Character, targetCharacter }
+    params.IgnoreWater = true
+    return workspace:Raycast(origin, direction, params) == nil
+end
+
+local function scoreCandidate(player, center, camera)
+    local char = player.Character
+    local hum = getHumanoid(player)
+    local root = getRoot(player)
+    local myRoot = getRoot(LocalPlayer)
+    if not char or not hum or not root or not myRoot or hum.Health <= 0 then return nil end
+    if player == LocalPlayer or isSameTeam(player) then return nil end
+
+    local aimPart = getTargetPart(char, targetPartName) or root
+    local screen, visible = camera:WorldToViewportPoint(aimPart.Position)
+    if not visible or screen.Z <= 0 then return nil end
+
+    local screenPos = Vector2.new(screen.X, screen.Y)
+    local screenDistance = (screenPos - center).Magnitude
+    local worldDistance = (root.Position - myRoot.Position).Magnitude
+    if worldDistance > maxTargetDistance or screenDistance > screenFov then return nil end
+
+    local score
+    if targetPriority == "Distance" then
+        score = worldDistance
+    elseif targetPriority == "Lowest Health" then
+        score = hum.Health + screenDistance * 0.05
+    elseif targetPriority == "Crosshair" then
+        score = screenDistance
+    else
+        -- Smart: favor targets that are both close and near the center.
+        score = screenDistance * 0.72 + worldDistance * 2.2
+    end
+
+    if currentTargetPart then
+        local currentModel = currentTargetPart:FindFirstAncestorOfClass("Model")
+        if currentModel == char then
+            score -= targetStickiness
+        end
+    end
+
+    return score, aimPart, root, hum
+end
+
+local function findBestTarget()
+    local camera = workspace.CurrentCamera
+    if not camera then return nil end
+    local viewport = camera.ViewportSize
+    local center = Vector2.new(viewport.X / 2, viewport.Y / 2)
+    local bestPart, bestScore = nil, math.huge
+
+    for _, player in ipairs(Players:GetPlayers()) do
+        local score, part = scoreCandidate(player, center, camera)
+        if score and score < bestScore then
+            bestScore = score
+            bestPart = part
+        end
+    end
+    return bestPart
+end
+
+local function isCurrentTargetValid(part)
+    if not part or not part.Parent then return false end
+    local model = part:FindFirstAncestorOfClass("Model")
+    local player = model and Players:GetPlayerFromCharacter(model)
+    if not player or player == LocalPlayer or isSameTeam(player) then return false end
+    local hum, root, myRoot = getHumanoid(player), getRoot(player), getRoot(LocalPlayer)
+    if not hum or hum.Health <= 0 or not root or not myRoot then return false end
+    return (root.Position - myRoot.Position).Magnitude <= maxTargetDistance + 6
+end
+
+local function setTarget(part)
+    currentTargetPart = part
+    if part and part.Parent then
+        local model = part:FindFirstAncestorOfClass("Model")
+        local player = model and Players:GetPlayerFromCharacter(model)
+        if player then monitorTargetHealth(player, getHumanoid(player)) end
+        if highlightTargetEnabled and model then
+            targetHighlight.Adornee = model
+            targetHighlight.Enabled = true
+            return
+        end
+    end
+    targetHighlight.Enabled = false
+    targetHighlight.Adornee = nil
+end
+
+local function refreshTarget(force)
+    if not force and not autoSwitch and isCurrentTargetValid(currentTargetPart) then
+        return currentTargetPart
+    end
+    local now = os.clock()
+    if not force and now - lastTargetSwitch < targetSwitchDelay and isCurrentTargetValid(currentTargetPart) then
+        return currentTargetPart
+    end
+
+    local best = findBestTarget()
+    if best ~= currentTargetPart or force then
+        setTarget(best)
+        lastTargetSwitch = now
+    end
+    return currentTargetPart
+end
+
+-- ============================================================
+-- PUNCH / ORBIT ENGINE
+-- ============================================================
+CombatTab:CreateSection("Punch / Auto Kill")
+
+local punchRange = 6.2
+local punchInterval = 0.22
+local autoPunchEnabled = false
+local autoKillEnabled = false
+local autoApproachEnabled = true
+local orbitEnabled = false
+local orbitRadius = 1.8
+local orbitSpeed = 8.5
+local orbitDirection = 1
+local orbitAngle = 0
+local orbitRadialGain = 5.0
+local orbitMaxMoveSpeed = 1.0
+local orbitFaceStrength = 0.82
+local orbitPunchAssist = true
+local lastPunchTime = 0
+local punchAttempts = 0
+
+-- Auto attacks are intentionally gated behind the master Combat Assist state.
+-- This prevents accidental clicking/attacking while browsing the UI.
+local function findFistTool()
+    local char = LocalPlayer.Character
+    local backpack = LocalPlayer:FindFirstChildOfClass("Backpack")
+    local keywords = { "fist", "fists", "punch", "boxing", "glove", "gloves", "hand" }
+
+    local function matches(obj)
+        if not obj or not obj:IsA("Tool") then return false end
+        local n = obj.Name:lower()
+        for _, key in ipairs(keywords) do
+            if n:find(key, 1, true) then return true end
+        end
+        return false
+    end
+
+    if char then
+        for _, obj in ipairs(char:GetChildren()) do
+            if matches(obj) then return obj end
+        end
+    end
+    if backpack then
+        for _, obj in ipairs(backpack:GetChildren()) do
+            if matches(obj) then return obj end
+        end
+    end
+    return nil
+end
+
+local function performPunch()
+    if not combatEnabled then return false end
+    local now = os.clock()
+    if now - lastPunchTime < punchInterval then return false end
+
+    local hum = getHumanoid()
+    local tool = findFistTool()
+    if not hum or not tool then return false end
+
+    if tool.Parent ~= LocalPlayer.Character then
+        local equipped = pcall(function() hum:EquipTool(tool) end)
+        if not equipped then return false end
+        task.wait(0.025)
+    end
+
+    if tool.Parent ~= LocalPlayer.Character then return false end
+
+    local ok = pcall(function()
+        tool:Activate()
+    end)
+
+    if ok then
+        lastPunchTime = now
+        recentAttackTime = now
+        local model = currentTargetPart and currentTargetPart:FindFirstAncestorOfClass("Model")
+        recentAttackTarget = model and Players:GetPlayerFromCharacter(model) or nil
+        punchAttempts += 1
+    end
+    return ok
+end
+
+local function getOrbitMoveVector(myRoot, targetRoot, radius, angle, direction, dt)
+    if not myRoot or not targetRoot then
+        return Vector3.zero
+    end
+
+    local targetPos = targetRoot.Position
+    local myPos = myRoot.Position
+
+    local offset = Vector3.new(
+        myPos.X - targetPos.X,
+        0,
+        myPos.Z - targetPos.Z
+    )
+
+    local currentDistance = offset.Magnitude
+    if currentDistance < 0.05 then
+        offset = Vector3.new(radius, 0, 0)
+        currentDistance = radius
+    end
+
+    local dtSafe = math.clamp(dt or (1 / 60), 1 / 240, 1 / 20)
+    orbitAngle += direction * orbitSpeed * dtSafe
+
+    -- Tangent component makes the player circle the target.
+    local tangent = Vector3.new(
+        -offset.Z / currentDistance,
+        0,
+        offset.X / currentDistance
+    ) * direction
+
+    -- Radial correction keeps the orbit close without teleporting.
+    local radiusError = radius - currentDistance
+    local radial = offset.Unit * math.clamp(radiusError * orbitRadialGain, -1, 1)
+
+    local move = tangent * 0.94 + radial * 0.65
+    if move.Magnitude > orbitMaxMoveSpeed then
+        move = move.Unit * orbitMaxMoveSpeed
+    end
+
+    return move
+end
+
+local function updateCombat(dt)
+    local camera = workspace.CurrentCamera
+    local myRoot = getRoot(LocalPlayer)
+    local myHum = getHumanoid()
+    if not camera or not myRoot or not myHum then return end
+
+    fovIndicator.Size = UDim2.fromOffset(screenFov * 2, screenFov * 2)
+    fovIndicator.Visible = combatEnabled and fovIndicatorEnabled
+
+    if not combatEnabled then
+        currentTargetPart = nil
+        targetHighlight.Enabled = false
+        return
+    end
+
+    local target = refreshTarget(false)
+    if not target or not target.Parent then return end
+
+    local model = target:FindFirstAncestorOfClass("Model")
+    local targetPlayer = model and Players:GetPlayerFromCharacter(model)
+    local targetRoot = targetPlayer and getRoot(targetPlayer)
+    local targetHum = targetPlayer and getHumanoid(targetPlayer)
+    if not model or not targetPlayer or not targetRoot or not targetHum or targetHum.Health <= 0 then
+        refreshTarget(true)
+        return
+    end
+
+    local aimPart = getTargetPart(model, targetPartName) or targetRoot
+    local predicted = getPredictedPosition(aimPart) or targetRoot.Position
+    local distance = (targetRoot.Position - myRoot.Position).Magnitude
+
+    if orbitEnabled then
+        -- Orbit uses normal Humanoid movement instead of CFrame teleporting.
+        -- This avoids the old “flying through the map” / physics spikes.
+        local moveVector = getOrbitMoveVector(myRoot, targetRoot, orbitRadius, orbitAngle, orbitDirection, dt)
+        myHum:Move(moveVector, false)
+    elseif autoApproachEnabled and distance > math.max(punchRange - 0.35, 2.5) then
+        local flat = Vector3.new(predicted.X - myRoot.Position.X, 0, predicted.Z - myRoot.Position.Z)
+        if flat.Magnitude > 0.1 then
+            myHum:Move(flat.Unit, false)
+        end
+    end
+
+    if faceTargetEnabled then
+        local flatTarget = Vector3.new(predicted.X, myRoot.Position.Y, predicted.Z)
+        local lookDelta = flatTarget - myRoot.Position
+        if lookDelta.Magnitude > 0.05 then
+            local desired = CFrame.lookAt(myRoot.Position, flatTarget)
+            local faceAlpha = orbitEnabled
+                and math.clamp(orbitFaceStrength, 0.35, 0.95)
+                or math.clamp(aimStrength * 0.55, 0.08, 0.48)
+            myRoot.CFrame = myRoot.CFrame:Lerp(desired, faceAlpha)
+        end
+    end
+
+    if cameraAimEnabled and not orbitEnabled then
+        local desiredCamera = CFrame.lookAt(camera.CFrame.Position, predicted)
+        camera.CFrame = camera.CFrame:Lerp(desiredCamera, math.clamp(aimStrength * 0.7, 0.1, 0.7))
+    end
+
+    local hitPart = getTargetPart(model, targetPartName) or targetRoot
+    local hitDistance = (hitPart.Position - myRoot.Position).Magnitude
+    local origin = myRoot.Position + Vector3.new(0, 1.2, 0)
+    local effectivePunchRange = orbitEnabled and math.max(punchRange, 6.5) or punchRange
+    local canPunch = hitDistance <= effectivePunchRange and hasLineOfSight(origin, hitPart, model)
+
+    if canPunch then
+        if orbitPunchAssist and orbitEnabled and hitDistance > punchRange then
+            local flat = Vector3.new(hitPart.Position.X - myRoot.Position.X, 0, hitPart.Position.Z - myRoot.Position.Z)
+            if flat.Magnitude > 0.1 then
+                myHum:Move(flat.Unit * 0.18, false)
+            end
+        end
+
+        if autoKillEnabled or autoPunchEnabled then
+            performPunch()
+        end
+    elseif (autoKillEnabled or autoPunchEnabled) and not orbitEnabled and autoApproachEnabled then
+        local flat = Vector3.new(hitPart.Position.X - myRoot.Position.X, 0, hitPart.Position.Z - myRoot.Position.Z)
+        if flat.Magnitude > 0.1 then
+            myHum:Move(flat.Unit, false)
+        end
+    end
+end
+
+pcall(function()
+    RunService:UnbindFromRenderStep("BoostLabCombat")
+    RunService:BindToRenderStep("BoostLabCombat", Enum.RenderPriority.Camera.Value + 1, updateCombat)
+end)
+
+local function setCombatEnabled(value, source)
+    combatEnabled = value
+    if not value then
+        currentTargetPart = nil
+        targetHighlight.Enabled = false
+    end
+    notify("Combat Assist", value and ("Enabled" .. (source and " • " .. source or "")) or "Disabled")
+end
+
+CombatTab:CreateToggle({
+    Name = "Enable Combat Assist",
+    CurrentValue = false,
+    Flag = "CombatAssistToggle",
+    Callback = function(value)
+        setCombatEnabled(value, "UI")
+    end,
+})
+
+CombatTab:CreateKeybind({
+    Name = "Combat Toggle Key",
+    CurrentKeybind = "Q",
+    HoldToInteract = false,
+    Flag = "CombatToggleKey",
+    Callback = function()
+        setCombatEnabled(not combatEnabled, "Keybind")
+    end,
+})
+
+CombatTab:CreateParagraph({
+    Title = "Activation",
+    Content = "Q toggles the master Combat Assist on/off. Auto Punch and Auto Kill only run while Combat Assist is enabled."
+})
+
+CombatTab:CreateToggle({
+    Name = "Strong Face Target",
+    CurrentValue = true,
+    Flag = "FaceTargetToggle",
+    Callback = function(value) faceTargetEnabled = value end,
+})
+
+CombatTab:CreateToggle({
+    Name = "Camera Tracking",
+    CurrentValue = true,
+    Flag = "CameraTracking",
+    Callback = function(value) cameraAimEnabled = value end,
+})
+
+CombatTab:CreateToggle({
+    Name = "Auto Target Switch",
+    CurrentValue = true,
+    Flag = "AutoTargetSwitch",
+    Callback = function(value) autoSwitch = value end,
+})
+
+CombatTab:CreateToggle({
+    Name = "Target Highlight",
+    CurrentValue = true,
+    Flag = "TargetHighlight",
+    Callback = function(value)
+        highlightTargetEnabled = value
+        targetHighlight.Enabled = value and currentTargetPart ~= nil
+    end,
+})
+
+CombatTab:CreateToggle({
+    Name = "Team Check",
+    CurrentValue = true,
+    Flag = "CombatTeamCheck",
+    Callback = function(value) teamCheck = value; currentTargetPart = nil end,
+})
+
+CombatTab:CreateDropdown({
+    Name = "Target Part",
+    Options = { "Head", "UpperTorso", "Torso", "HumanoidRootPart" },
+    CurrentOption = { "UpperTorso" },
+    MultipleOptions = false,
+    Flag = "TargetPart",
+    Callback = function(option) targetPartName = option[1]; currentTargetPart = nil end,
+})
+
+CombatTab:CreateDropdown({
+    Name = "Target Priority",
+    Options = { "Smart", "Crosshair", "Distance", "Lowest Health" },
+    CurrentOption = { "Smart" },
+    MultipleOptions = false,
+    Flag = "TargetPriority",
+    Callback = function(option) targetPriority = option[1]; currentTargetPart = nil end,
+})
+
+CombatTab:CreateSlider({
+    Name = "Target FOV",
+    Range = { 50, 400 },
+    Increment = 10,
+    Suffix = " px",
+    CurrentValue = 280,
+    Flag = "LockFOV",
+    Callback = function(value) screenFov = value end,
+})
+
+CombatTab:CreateToggle({
+    Name = "Show FOV",
+    CurrentValue = true,
+    Flag = "ShowBoxingFOV",
+    Callback = function(value) fovIndicatorEnabled = value end,
+})
+
+CombatTab:CreateSlider({
+    Name = "Max Target Distance",
+    Range = { 10, 200 },
+    Increment = 5,
+    Suffix = " studs",
+    CurrentValue = 90,
+    Flag = "MaxTargetDistance",
+    Callback = function(value) maxTargetDistance = value end,
+})
+
+CombatTab:CreateSlider({
+    Name = "Tracking Strength",
+    Range = { 40, 100 },
+    Increment = 5,
+    Suffix = "%",
+    CurrentValue = 92,
+    Flag = "TrackingStrength",
+    Callback = function(value) aimStrength = value / 100 end,
+})
+
+CombatTab:CreateSlider({
+    Name = "Movement Prediction",
+    Range = { 0, 25 },
+    Increment = 1,
+    Suffix = " x10ms",
+    CurrentValue = 10,
+    Flag = "TargetPrediction",
+    Callback = function(value) predictionTime = value / 100 end,
+})
+
+CombatTab:CreateSlider({
+    Name = "Target Stickiness",
+    Range = { 0, 100 },
+    Increment = 5,
+    Suffix = "%",
+    CurrentValue = 45,
+    Flag = "TargetStickiness",
+    Callback = function(value) targetStickiness = value end,
+})
+
+CombatTab:CreateToggle({
+    Name = "Auto Punch",
+    CurrentValue = false,
+    Flag = "AutoPunch",
+    Callback = function(value) autoPunchEnabled = value end,
+})
+
+CombatTab:CreateToggle({
+    Name = "Auto Kill",
+    CurrentValue = false,
+    Flag = "AutoKill",
+    Callback = function(value)
+        autoKillEnabled = value
+        notify("Auto Kill", value and "Ready • requires Combat Assist" or "Disabled")
+    end,
+})
+
+CombatTab:CreateSlider({
+    Name = "Punch Range",
+    Range = { 3, 10 },
+    Increment = 0.2,
+    Suffix = " studs",
+    CurrentValue = 6.2,
+    Flag = "PunchRange",
+    Callback = function(value) punchRange = value end,
+})
+
+CombatTab:CreateSlider({
+    Name = "Punch Delay",
+    Range = { 10, 60 },
+    Increment = 5,
+    Suffix = " x10ms",
+    CurrentValue = 22,
+    Flag = "PunchDelay",
+    Callback = function(value) punchInterval = value / 100 end,
+})
+
+CombatTab:CreateToggle({
+    Name = "Hit Confirmation",
+    CurrentValue = true,
+    Flag = "HitConfirmation",
+    Callback = function(value)
+        hitConfirmEnabled = value
+        if not value and hitConfirmGui then hitConfirmGui:Destroy(); hitConfirmGui = nil end
+    end,
+})
+
+CombatTab:CreateToggle({
+    Name = "Auto Approach",
+    CurrentValue = true,
+    Flag = "AutoApproach",
+    Callback = function(value) autoApproachEnabled = value end,
+})
+
+CombatTab:CreateSection("Orbit")
+
+CombatTab:CreateToggle({
+    Name = "Orbit Target",
+    CurrentValue = false,
+    Flag = "OrbitTarget",
+    Callback = function(value)
+        orbitEnabled = value
+        if value then
+            orbitAngle = 0
+        end
+    end,
+})
+
+CombatTab:CreateSlider({
+    Name = "Orbit Distance",
+    Range = { 1.0, 3.5 },
+    Increment = 0.1,
+    Suffix = " studs",
+    CurrentValue = 1.8,
+    Flag = "OrbitDistance",
+    Callback = function(value) orbitRadius = value end,
+})
+
+CombatTab:CreateSlider({
+    Name = "Orbit Speed",
+    Range = { 10, 140 },
+    Increment = 5,
+    Suffix = " x0.1",
+    CurrentValue = 85,
+    Flag = "OrbitSpeed",
+    Callback = function(value) orbitSpeed = value / 10 end,
+})
+
+CombatTab:CreateDropdown({
+    Name = "Orbit Direction",
+    Options = { "Clockwise", "Counterclockwise" },
+    CurrentOption = { "Clockwise" },
+    MultipleOptions = false,
+    Flag = "OrbitDirection",
+    Callback = function(option) orbitDirection = option[1] == "Clockwise" and 1 or -1 end,
+})
+
+CombatTab:CreateToggle({
+    Name = "Line of Sight",
+    CurrentValue = false,
+    Flag = "CombatLOS",
+    Callback = function(value) requireLineOfSight = value end,
+})
+
+CombatTab:CreateButton({
+    Name = "Acquire Nearest Target",
+    Callback = function()
+        setCombatEnabled(true, "Manual")
+        local target = refreshTarget(true)
+        notify("Target", target and "Target acquired" or "No valid opponent found")
+    end,
+})
+
+CombatTab:CreateParagraph({
+    Title = "Combat Status",
+    Content = "Q toggles Combat Assist. Auto Punch and Auto Kill are gated by Combat Assist. Orbit uses Humanoid movement instead of teleporting the character, which is much less likely to cause physics spikes or map launches."
+})
+
+
+-- VISUALS
+-- ============================================================
+VisualsTab:CreateParagraph({
+    Title = "Boxing Visuals",
+    Content = "Clean opponent information for close-range fights. ESP uses Roblox Highlight/Billboard objects for better compatibility."
+})
+VisualsTab:CreateSection("Opponent ESP")
+
+local espEnabled = false
+local showHealth = true
+local showDistance = true
+local showNames = true
+local espObjects = {}
+local espColor = Color3.fromRGB(154, 68, 255)
+local teammateColor = Color3.fromRGB(60, 210, 120)
+
+local function destroyESP(player)
+    local data = espObjects[player]
+    if not data then return end
+    if data.highlight then data.highlight:Destroy() end
+    if data.billboard then data.billboard:Destroy() end
+    espObjects[player] = nil
+end
+
+local function createESP(player)
+    if player == LocalPlayer then return end
+    local char = player.Character
+    local root = getRoot(player)
+    if not char or not root then return end
+    if espObjects[player] and espObjects[player].character == char then return end
+    destroyESP(player)
+
+    local highlight = Instance.new("Highlight")
+    highlight.Name = "BoostLabESP"
+    highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+    highlight.FillTransparency = 0.82
+    highlight.OutlineTransparency = 0.12
+    highlight.Parent = char
+
+    local billboard = Instance.new("BillboardGui")
+    billboard.Name = "BoostLabESPInfo"
+    billboard.AlwaysOnTop = true
+    billboard.Size = UDim2.new(0, 180, 0, 42)
+    billboard.StudsOffset = Vector3.new(0, 3.1, 0)
+    billboard.Adornee = root
+    billboard.Parent = root
+
+    local label = Instance.new("TextLabel")
+    label.Size = UDim2.fromScale(1, 1)
+    label.BackgroundTransparency = 1
+    label.Font = Enum.Font.GothamBold
+    label.TextSize = 14
+    label.TextStrokeTransparency = 0.45
+    label.Parent = billboard
+
+    espObjects[player] = { character = char, highlight = highlight, billboard = billboard, label = label }
+end
+
+local function updateESP()
+    for _, player in ipairs(Players:GetPlayers()) do
+        if player ~= LocalPlayer then
+            if espEnabled then
+                createESP(player)
+            else
+                destroyESP(player)
+            end
+        end
+    end
+end
+
+RunService.RenderStepped:Connect(function()
+    if not espEnabled then return end
+    local myRoot = getRoot(LocalPlayer)
+    if not myRoot then return end
+
+    for _, player in ipairs(Players:GetPlayers()) do
+        if player ~= LocalPlayer then
+            local data = espObjects[player]
+            local char = player.Character
+            local root = getRoot(player)
+            local hum = getHumanoid(player)
+            if data and data.character ~= char then
+                createESP(player)
+                data = espObjects[player]
+            end
+            if data and data.label and root and hum then
+                local sameTeam = isSameTeam(player)
+                local displayColor = sameTeam and teammateColor or espColor
+                data.highlight.FillColor = displayColor
+                data.highlight.OutlineColor = displayColor
+                local parts = {}
+                if showNames then table.insert(parts, player.Name) end
+                if showHealth then table.insert(parts, string.format("HP %d", math.floor(hum.Health + 0.5))) end
+                if showDistance then table.insert(parts, string.format("%dm", math.floor((root.Position - myRoot.Position).Magnitude))) end
+                data.label.Text = table.concat(parts, "  •  ")
+                data.label.TextColor3 = displayColor
+                data.highlight.Enabled = true
+                data.billboard.Enabled = true
+            elseif data then
+                data.highlight.Enabled = false
+                data.billboard.Enabled = false
+            end
+        end
+    end
+end)
+
+VisualsTab:CreateToggle({
+    Name = "Enable Opponent ESP",
+    CurrentValue = false,
+    Flag = "OpponentESP",
+    Callback = function(value)
+        espEnabled = value
+        updateESP()
+    end,
+})
+VisualsTab:CreateToggle({
+    Name = "Show Names",
+    CurrentValue = true,
+    Flag = "ESPNames",
+    Callback = function(value) showNames = value end,
+})
+VisualsTab:CreateToggle({
+    Name = "Show Health",
+    CurrentValue = true,
+    Flag = "ESPHealth",
+    Callback = function(value) showHealth = value end,
+})
+VisualsTab:CreateToggle({
+    Name = "Show Distance",
+    CurrentValue = true,
+    Flag = "ESPDistance",
+    Callback = function(value) showDistance = value end,
+})
+VisualsTab:CreateColorPicker({
+    Name = "ESP Color",
+    Color = espColor,
+    Flag = "ESPColor",
+    Callback = function(value)
+        espColor = value
+    end,
+})
+
+Players.PlayerAdded:Connect(function(player)
+    player.CharacterAdded:Connect(function()
+        task.wait(0.35)
+        if espEnabled then createESP(player) end
+    end)
+end)
+Players.PlayerRemoving:Connect(function(player)
+    destroyESP(player)
+    if currentTargetPart and currentTargetPart:IsDescendantOf(player.Character or workspace) then
+        clearTarget()
+    end
+end)
+for _, player in ipairs(Players:GetPlayers()) do
+    if player ~= LocalPlayer then
+        player.CharacterAdded:Connect(function()
+            task.wait(0.35)
+            if espEnabled then createESP(player) end
+        end)
+    end
+end
+
+VisualsTab:CreateSection("Camera")
+local originalFov = (workspace.CurrentCamera and workspace.CurrentCamera.FieldOfView) or 70
+local currentFov = originalFov
+VisualsTab:CreateSlider({
+    Name = "Field of View",
+    Range = { 40, 120 },
+    Increment = 5,
+    Suffix = "°",
+    CurrentValue = math.floor(currentFov),
+    Flag = "CameraFOV",
+    Callback = function(value)
+        currentFov = value
+        if workspace.CurrentCamera then
+            workspace.CurrentCamera.FieldOfView = value
+        end
+    end,
+})
+
+VisualsTab:CreateButton({
+    Name = "Reset Camera FOV",
+    Callback = function()
+        currentFov = originalFov
+        if workspace.CurrentCamera then
+            workspace.CurrentCamera.FieldOfView = originalFov
+        end
+    end,
+})
+
+-- ============================================================
+-- MOVEMENT
+-- ============================================================
+MovementTab:CreateParagraph({
+    Title = "Movement",
+    Content = "Movement tools suitable for arena-style boxing maps. Values reapply after respawn."
+})
+MovementTab:CreateSection("Player Movement")
+
+local walkSpeed = 16
+local jumpPower = 50
+local speedEnabled = false
+local jumpEnabled = false
+local infiniteJump = false
+local noclipEnabled = false
+local flyEnabled = false
+local flySpeed = 55
+local flyConnection
+local noclipConnection
+local bodyVelocity
+local bodyGyro
+
+local function applyMovement()
+    local hum = getHumanoid()
+    if not hum then return end
+    hum.WalkSpeed = speedEnabled and walkSpeed or 16
+    hum.UseJumpPower = true
+    hum.JumpPower = jumpEnabled and jumpPower or 50
+end
+
+LocalPlayer.CharacterAdded:Connect(function(char)
+    local hum = char:WaitForChild("Humanoid", 5)
+    if hum then
+        task.wait(0.1)
+        applyMovement()
+    end
+    if flyEnabled then
+        flyEnabled = false
+        if flyConnection then flyConnection:Disconnect(); flyConnection = nil end
+    end
+end)
+
+MovementTab:CreateToggle({
+    Name = "Custom Walk Speed",
+    CurrentValue = false,
+    Flag = "CustomWalkSpeed",
+    Callback = function(value)
+        speedEnabled = value
+        applyMovement()
+    end,
+})
+MovementTab:CreateSlider({
+    Name = "Walk Speed Value",
+    Range = { 16, 150 },
+    Increment = 2,
+    Suffix = " studs/s",
+    CurrentValue = 28,
+    Flag = "WalkSpeedValue",
+    Callback = function(value)
+        walkSpeed = value
+        if speedEnabled then applyMovement() end
+    end,
+})
+MovementTab:CreateToggle({
+    Name = "Custom Jump Power",
+    CurrentValue = false,
+    Flag = "CustomJumpPower",
+    Callback = function(value)
+        jumpEnabled = value
+        applyMovement()
+    end,
+})
+MovementTab:CreateSlider({
+    Name = "Jump Power Value",
+    Range = { 50, 250 },
+    Increment = 10,
+    Suffix = "",
+    CurrentValue = 70,
+    Flag = "JumpPowerValue",
+    Callback = function(value)
+        jumpPower = value
+        if jumpEnabled then applyMovement() end
+    end,
+})
+
+UserInputService.JumpRequest:Connect(function()
+    if not infiniteJump then return end
+    local hum = getHumanoid()
+    if hum and hum.Health > 0 then
+        hum:ChangeState(Enum.HumanoidStateType.Jumping)
+    end
+end)
+
+MovementTab:CreateToggle({
+    Name = "Infinite Jump",
+    CurrentValue = false,
+    Flag = "InfiniteJump",
+    Callback = function(value) infiniteJump = value end,
+})
+
+MovementTab:CreateSection("Noclip / Flight")
+local function setNoclip(value)
+    noclipEnabled = value
+    if noclipConnection then
+        noclipConnection:Disconnect()
+        noclipConnection = nil
+    end
+    if value then
+        noclipConnection = RunService.Stepped:Connect(function()
+            local char = getCharacter()
+            if not char then return end
+            for _, part in ipairs(char:GetDescendants()) do
+                if part:IsA("BasePart") then
+                    part.CanCollide = false
+                end
+            end
+        end)
+    else
+        local char = getCharacter()
+        if char then
+            for _, part in ipairs(char:GetDescendants()) do
+                if part:IsA("BasePart") then
+                    part.CanCollide = true
+                end
+            end
+        end
+    end
+end
+
+MovementTab:CreateToggle({
+    Name = "Noclip",
+    CurrentValue = false,
+    Flag = "Noclip",
+    Callback = function(value)
+        setNoclip(value)
+    end,
+})
+
+local function stopFly()
+    flyEnabled = false
+    if flyConnection then flyConnection:Disconnect(); flyConnection = nil end
+    if bodyVelocity then bodyVelocity:Destroy(); bodyVelocity = nil end
+    if bodyGyro then bodyGyro:Destroy(); bodyGyro = nil end
+    local hum = getHumanoid()
+    if hum then hum.PlatformStand = false end
+end
+
+local function startFly()
+    stopFly()
+    local root = getRoot(LocalPlayer)
+    local hum = getHumanoid(LocalPlayer)
+    if not root or not hum then return end
+    flyEnabled = true
+
+    bodyVelocity = Instance.new("BodyVelocity")
+    bodyVelocity.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
+    bodyVelocity.P = 12000
+    bodyVelocity.Velocity = Vector3.zero
+    bodyVelocity.Parent = root
+
+    bodyGyro = Instance.new("BodyGyro")
+    bodyGyro.MaxTorque = Vector3.new(math.huge, math.huge, math.huge)
+    bodyGyro.P = 9000
+    bodyGyro.CFrame = workspace.CurrentCamera.CFrame
+    bodyGyro.Parent = root
+
+    hum.PlatformStand = true
+
+    flyConnection = RunService.RenderStepped:Connect(function()
+        if not flyEnabled or not bodyVelocity or not bodyGyro then return end
+        local camera = workspace.CurrentCamera
+        local direction = Vector3.zero
+        if UserInputService:IsKeyDown(Enum.KeyCode.W) then direction += camera.CFrame.LookVector end
+        if UserInputService:IsKeyDown(Enum.KeyCode.S) then direction -= camera.CFrame.LookVector end
+        if UserInputService:IsKeyDown(Enum.KeyCode.A) then direction -= camera.CFrame.RightVector end
+        if UserInputService:IsKeyDown(Enum.KeyCode.D) then direction += camera.CFrame.RightVector end
+        if UserInputService:IsKeyDown(Enum.KeyCode.Space) then direction += Vector3.yAxis end
+        if UserInputService:IsKeyDown(Enum.KeyCode.LeftControl) then direction -= Vector3.yAxis end
+        if direction.Magnitude > 0 then direction = direction.Unit * flySpeed end
+        bodyVelocity.Velocity = direction
+        bodyGyro.CFrame = camera.CFrame
+    end)
+end
+
+MovementTab:CreateToggle({
+    Name = "Fly",
+    CurrentValue = false,
+    Flag = "Fly",
+    Callback = function(value)
+        if value then startFly() else stopFly() end
+    end,
+})
+MovementTab:CreateSlider({
+    Name = "Fly Speed",
+    Range = { 10, 200 },
+    Increment = 5,
+    Suffix = " studs/s",
+    CurrentValue = 55,
+    Flag = "FlySpeed",
+    Callback = function(value) flySpeed = value end,
+})
+
+-- ============================================================
+-- BOXING-SPECIFIC QUALITY OF LIFE
+-- ============================================================
+MovementTab:CreateSection("Boxing QoL")
+local noRagdoll = false
+local noFall = false
+
+local function updateLocalStates()
+    local hum = getHumanoid()
+    if not hum then return end
+    pcall(function()
+        hum:SetStateEnabled(Enum.HumanoidStateType.FallingDown, not noRagdoll)
+        hum:SetStateEnabled(Enum.HumanoidStateType.Ragdoll, not noRagdoll)
+        hum:SetStateEnabled(Enum.HumanoidStateType.PlatformStanding, not noRagdoll)
+    end)
+end
+
+MovementTab:CreateToggle({
+    Name = "Reduce Local Ragdoll",
+    CurrentValue = false,
+    Flag = "ReduceRagdoll",
+    Callback = function(value)
+        noRagdoll = value
+        updateLocalStates()
+    end,
+})
+MovementTab:CreateToggle({
+    Name = "Reduce Local Fall States",
+    CurrentValue = false,
+    Flag = "ReduceFall",
+    Callback = function(value)
+        noFall = value
+        local hum = getHumanoid()
+        if hum then
+            pcall(function()
+                hum:SetStateEnabled(Enum.HumanoidStateType.FallingDown, not value)
+            end)
+        end
+    end,
+})
+
+
+-- ============================================================
+-- ============================================================
+-- AUTO FARM - Fight in Prison BANK training
+-- ============================================================
+AutoFarmTab:CreateParagraph({
+    Title = "Strength Auto Farm",
+    Content = "Finds the real BANK ProximityPrompt, walks to it, holds E, then left-clicks while the workout is active."
+})
+
+AutoFarmTab:CreateSection("Training")
+
+local autoFarmEnabled = false
+local farmClickInterval = 5.15
+local liftHoldDuration = 4.8
+local liftInputMode = "Hold Mouse1"
+local farmReacquireDelay = 0.6
+local farmSearchRadius = 350
+local farmPrompt = nil
+local farmBankModel = nil
+local farmStatus = "Idle"
+
+local function containsAny(textValue, keywords)
+    local s = string.lower(textValue or "")
+    for _, keyword in ipairs(keywords) do
+        if string.find(s, keyword, 1, true) then
+            return true
+        end
+    end
+    return false
+end
+
+local BANK_WORDS = {
+    "bank", "bench", "workout", "strength", "weight", "lift", "press", "gym"
+}
+
+local function getPromptPosition(prompt)
+    if not prompt or not prompt.Parent then
+        return nil
+    end
+
+    if prompt.Parent:IsA("Attachment") and prompt.Parent.Parent and prompt.Parent.Parent:IsA("BasePart") then
+        return prompt.Parent.Parent.Position
+    end
+
+    if prompt.Parent:IsA("BasePart") then
+        return prompt.Parent.Position
+    end
+
+    local ancestorPart = prompt:FindFirstAncestorWhichIsA("BasePart")
+    return ancestorPart and ancestorPart.Position or nil
+end
+
+local function getPromptContext(prompt)
+    local parts = {
+        prompt.Name,
+        prompt.ActionText,
+        prompt.ObjectText,
+    }
+
+    local current = prompt.Parent
+    for _ = 1, 5 do
+        if not current then
+            break
+        end
+        parts[#parts + 1] = current.Name
+        current = current.Parent
+    end
+
+    return table.concat(parts, " ")
+end
+
+local function looksLikeBankPrompt(prompt)
+    if not prompt or not prompt:IsA("ProximityPrompt") or not prompt.Enabled then
+        return false
+    end
+
+    local textValue = string.lower(getPromptContext(prompt))
+
+    -- Fight in Prison visibly uses an "E / BANK" interaction.
+    if string.find(textValue, "bank", 1, true) then
+        return true
+    end
+
+    -- Secondary names keep the farm usable if the same station is renamed.
+    return containsAny(textValue, {"bench", "workout", "strength", "weight", "lift", "press"})
+end
+
+local function scoreBankPrompt(prompt, root)
+    if not looksLikeBankPrompt(prompt) then
+        return -math.huge
+    end
+
+    local position = getPromptPosition(prompt)
+    if not position then
+        return -math.huge
+    end
+
+    local distance = (position - root.Position).Magnitude
+    if distance > farmSearchRadius then
+        return -math.huge
+    end
+
+    local context = string.lower(getPromptContext(prompt))
+    local score = 0
+
+    -- Exact BANK prompt gets the highest priority.
+    if string.find(context, "bank", 1, true) then score += 500 end
+    if string.find(context, "bench", 1, true) then score += 150 end
+    if string.find(context, "workout", 1, true) then score += 120 end
+    if string.find(context, "strength", 1, true) then score += 100 end
+    if string.find(context, "weight", 1, true) then score += 90 end
+    if string.find(context, "lift", 1, true) then score += 80 end
+
+    score -= distance * 0.35
+    return score
+end
+
+local function findFreeBankPrompt()
+    local root = getRoot()
+    if not root then
+        return nil, nil
+    end
+
+    local bestPrompt = nil
+    local bestModel = nil
+    local bestScore = -math.huge
+
+    for _, obj in ipairs(workspace:GetDescendants()) do
+        if obj:IsA("ProximityPrompt") and obj.Enabled then
+            local score = scoreBankPrompt(obj, root)
+            if score > bestScore then
+                bestScore = score
+                bestPrompt = obj
+                bestModel = obj:FindFirstAncestorOfClass("Model") or obj.Parent
+            end
+        end
+    end
+
+    return bestPrompt, bestModel
+end
+
+local function getPromptDistance(prompt)
+    local root = getRoot()
+    local position = getPromptPosition(prompt)
+    if not root or not position then
+        return math.huge
+    end
+    return (position - root.Position).Magnitude
+end
+
+local function moveToBankPrompt(prompt)
+    local hum = getHumanoid()
+    if not hum or not prompt or not prompt.Parent then
+        return false
+    end
+
+    local position = getPromptPosition(prompt)
+    if not position then
+        return false
+    end
+
+    local started = os.clock()
+
+    while autoFarmEnabled and prompt.Parent and os.clock() - started < 15 do
+        local root = getRoot()
+        hum = getHumanoid()
+        position = getPromptPosition(prompt)
+
+        if not root or not hum or not position then
+            return false
+        end
+
+        local distance = (position - root.Position).Magnitude
+        if distance <= 6.0 then
+            return true
+        end
+
+        -- Re-issue MoveTo so the humanoid continues walking even when
+        -- the target is slightly obstructed or the path updates.
+        hum:MoveTo(position)
+        task.wait(0.12)
+    end
+
+    return getPromptDistance(prompt) <= 6.0
+end
+
+local function sendEKey(holdTime)
+    holdTime = math.max(0.2, holdTime or 0.8)
+
+    local ok, vim = pcall(function()
+        return game:GetService("VirtualInputManager")
+    end)
+
+    if ok and vim then
+        local success = pcall(function()
+            vim:SendKeyEvent(true, Enum.KeyCode.E, false, game)
+            task.wait(holdTime)
+            vim:SendKeyEvent(false, Enum.KeyCode.E, false, game)
+        end)
+        if success then
+            return true
+        end
+    end
+
+    if type(keypress) == "function" and type(keyrelease) == "function" then
+        local success = pcall(function()
+            keypress(Enum.KeyCode.E)
+            task.wait(holdTime)
+            keyrelease(Enum.KeyCode.E)
+        end)
+        if success then
+            return true
+        end
+    end
+
+    return false
+end
+
+local function activateBankPrompt(prompt)
+    if not prompt or not prompt.Parent or not prompt.Enabled then
+        return false
+    end
+
+    local holdTime = math.max(0.2, tonumber(prompt.HoldDuration) or 0)
+
+    -- Use a real E hold first. This matches the visible BANK interaction.
+    farmStatus = "Holding E • BANK"
+    sendEKey(holdTime + 0.10)
+
+    task.wait(0.25)
+
+    -- Executor fallback for cases where keyboard simulation is unavailable.
+    if prompt.Parent and prompt.Enabled and type(fireproximityprompt) == "function" then
+        pcall(function()
+            fireproximityprompt(prompt, holdTime)
+        end)
+        task.wait(0.25)
+    end
+
+    return true
+end
+
+local function getMousePosition()
+    local camera = workspace.CurrentCamera
+    if not camera then
+        return 1, 1
+    end
+
+    local mouse = LocalPlayer:GetMouse()
+    local x = tonumber(mouse.X) or (camera.ViewportSize.X * 0.5)
+    local y = tonumber(mouse.Y) or (camera.ViewportSize.Y * 0.5)
+
+    return math.floor(x), math.floor(y)
+end
+
+local function leftClickOnce()
+    -- Simple executor click first.
+    if type(mouse1click) == "function" then
+        local ok = pcall(function()
+            mouse1click()
+        end)
+        if ok then
+            return "mouse1click"
+        end
+    end
+
+    -- Press/release fallback.
+    if type(mouse1press) == "function" and type(mouse1release) == "function" then
+        local ok = pcall(function()
+            mouse1press()
+            task.wait(0.02)
+            mouse1release()
+        end)
+        if ok then
+            return "mouse1press"
+        end
+    end
+
+    local x, y = getMousePosition()
+
+    -- VirtualInputManager fallback.
+    local okVIM, vim = pcall(function()
+        return game:GetService("VirtualInputManager")
+    end)
+
+    if okVIM and vim then
+        local ok = pcall(function()
+            vim:SendMouseButtonEvent(x, y, 0, true, game, 0)
+            task.wait(0.02)
+            vim:SendMouseButtonEvent(x, y, 0, false, game, 0)
+        end)
+        if ok then
+            return "VirtualInputManager"
+        end
+    end
+
+    return nil
+end
+
+local function fireFarmClick()
+    return leftClickOnce()
+end
+
+local function bankStillUsable(prompt)
+    if not prompt or not prompt.Parent or not prompt.Enabled then
+        return false
+    end
+
+    local root = getRoot()
+    if not root then
+        return false
+    end
+
+    return getPromptDistance(prompt) <= 8.0
+end
+
+local function farmBank(prompt)
+    farmPrompt = prompt
+    farmStatus = "Walking to BANK"
+
+    if not moveToBankPrompt(prompt) then
+        farmStatus = "Could not reach BANK"
+        return false
+    end
+
+    -- Small pause so the prompt is definitely in interaction range.
+    task.wait(0.15)
+
+    if not bankStillUsable(prompt) then
+        farmStatus = "BANK prompt unavailable"
+        return false
+    end
+
+    if not activateBankPrompt(prompt) then
+        farmStatus = "BANK activation failed"
+        return false
+    end
+
+    -- Allow the game's workout animation/state to start.
+    task.wait(0.45)
+
+    farmStatus = "Training • left click spam"
+
+    local failedInputs = 0
+
+    while autoFarmEnabled and bankStillUsable(prompt) do
+        local method = fireFarmClick()
+
+        if method then
+            failedInputs = 0
+            farmStatus = "Training • Mouse1 spam"
+        else
+            failedInputs += 1
+            farmStatus = "Mouse1 input unavailable"
+        end
+
+        -- The game can ignore clicks while its own lift cooldown is active.
+        -- Sending repeated left clicks is intentional, as requested.
+        task.wait(0.08)
+
+        if failedInputs >= 15 then
+            task.wait(0.5)
+            failedInputs = 0
+        end
+    end
+    return false
+end
+
+local farmThread
+
+local function stopAutoFarm()
+    autoFarmEnabled = false
+    farmPrompt = nil
+    farmBankModel = nil
+    farmStatus = "Stopped"
+
+    if farmThread then
+        task.cancel(farmThread)
+        farmThread = nil
+    end
+end
+
+local function startAutoFarm()
+    stopAutoFarm()
+    autoFarmEnabled = true
+    farmStatus = "Searching for BANK..."
+
+    farmThread = task.spawn(function()
+        while autoFarmEnabled do
+            local prompt, model = findFreeBankPrompt()
+
+            if prompt then
+                farmPrompt = prompt
+                farmBankModel = model
+                farmStatus = "BANK found • walking"
+                farmBank(prompt)
+            else
+                farmStatus = "No BANK found"
+                task.wait(farmReacquireDelay)
+            end
+
+            if autoFarmEnabled then
+                farmPrompt = nil
+                farmBankModel = nil
+                task.wait(farmReacquireDelay)
+            end
+        end
+    end)
+end
+
+AutoFarmTab:CreateToggle({
+    Name = "Auto Farm Strength",
+    CurrentValue = false,
+    Flag = "AutoFarmStrength",
+    Callback = function(value)
+        if value then
+            startAutoFarm()
+        else
+            stopAutoFarm()
+        end
+        notify("BoostLab Auto Farm", value and "Finding BANK..." or "Disabled", 2)
+    end,
+})
+
+AutoFarmTab:CreateSlider({
+    Name = "Lift Cooldown",
+    Range = { 4.5, 7.0 },
+    Increment = 0.1,
+    Suffix = " s",
+    CurrentValue = 5.2,
+    Flag = "FarmClickInterval",
+    Callback = function(value)
+        farmClickInterval = value
+    end,
+})
+
+AutoFarmTab:CreateSlider({
+    Name = "BANK Search Radius",
+    Range = { 50, 700 },
+    Increment = 25,
+    Suffix = " studs",
+    CurrentValue = 350,
+    Flag = "FarmSearchRadius",
+    Callback = function(value)
+        farmSearchRadius = value
+    end,
+})
+
+AutoFarmTab:CreateSlider({
+    Name = "Reacquire Delay",
+    Range = { 1, 20 },
+    Increment = 1,
+    Suffix = " x0.5s",
+    CurrentValue = 1,
+    Flag = "FarmReacquireDelay",
+    Callback = function(value)
+        farmReacquireDelay = value / 2
+    end,
+})
+
+AutoFarmTab:CreateButton({
+    Name = "Test Lift Click",
+    Callback = function()
+        if not farmPrompt or not farmPrompt.Parent then
+            notify("Lift Test", "Enable Auto Farm first or use Find BANK.", 3)
+            return
+        end
+
+        local method = fireFarmClick()
+        notify("Lift Test", method and ("Sent via " .. method) or "No input method worked", 3)
+    end,
+})
+
+AutoFarmTab:CreateButton({
+    Name = "Find BANK",
+    Callback = function()
+        local prompt, model = findFreeBankPrompt()
+        if prompt then
+            farmPrompt = prompt
+            farmBankModel = model
+            notify("BANK Found", string.format("%s • %.1f studs away", prompt.ActionText ~= "" and prompt.ActionText or prompt.ObjectText, getPromptDistance(prompt)), 3)
+        else
+            notify("BANK", "No enabled BANK prompt found nearby", 3)
+        end
+    end,
+})
+
+AutoFarmTab:CreateParagraph({
+    Title = "Status",
+    Content = "The farm searches for the actual BANK ProximityPrompt, walks to the prompt position, holds E, waits for the workout state, then sends left clicks. It does not depend on a Seat or Humanoid.Sit."
+})
+
+-- ============================================================
+-- UTILITY
+-- ============================================================
+UtilityTab:CreateParagraph({
+    Title = "Utility",
+    Content = "General tools for longer sessions, visibility and quick BoostLab links."
+})
+UtilityTab:CreateSection("Session")
+
+local antiAfkConnection
+local antiAfkEnabled = false
+local function setAntiAFK(value)
+    antiAfkEnabled = value
+    if antiAfkConnection then
+        antiAfkConnection:Disconnect()
+        antiAfkConnection = nil
+    end
+    if value then
+        antiAfkConnection = LocalPlayer.Idled:Connect(function()
+            pcall(function()
+                local VirtualUser = game:GetService("VirtualUser")
+                VirtualUser:Button2Down(Vector2.new(0, 0), workspace.CurrentCamera.CFrame)
+                task.wait(0.08)
+                VirtualUser:Button2Up(Vector2.new(0, 0), workspace.CurrentCamera.CFrame)
+            end)
+        end)
+    end
+end
+
+UtilityTab:CreateToggle({
+    Name = "Anti-AFK",
+    CurrentValue = true,
+    Flag = "AntiAFK",
+    Callback = function(value) setAntiAFK(value) end,
+})
+
+local savedLighting = {}
+local fullbright = false
+local function setFullbright(value)
+    fullbright = value
+    if value then
+        savedLighting.Brightness = Lighting.Brightness
+        savedLighting.ClockTime = Lighting.ClockTime
+        savedLighting.FogEnd = Lighting.FogEnd
+        savedLighting.GlobalShadows = Lighting.GlobalShadows
+        Lighting.Brightness = 3
+        Lighting.ClockTime = 14
+        Lighting.FogEnd = 100000
+        Lighting.GlobalShadows = false
+    else
+        if savedLighting.Brightness then Lighting.Brightness = savedLighting.Brightness end
+        if savedLighting.ClockTime then Lighting.ClockTime = savedLighting.ClockTime end
+        if savedLighting.FogEnd then Lighting.FogEnd = savedLighting.FogEnd end
+        if savedLighting.GlobalShadows ~= nil then Lighting.GlobalShadows = savedLighting.GlobalShadows end
+    end
+end
+
+UtilityTab:CreateToggle({
+    Name = "Fullbright",
+    CurrentValue = false,
+    Flag = "Fullbright",
+    Callback = function(value) setFullbright(value) end,
+})
+
+UtilityTab:CreateButton({
+    Name = "Copy BoostLab Discord",
+    Callback = function()
+        pcall(function()
+            setclipboard("https://discord.gg/RfVsQcyUZp")
+        end)
+        notify("BoostLab", "Discord link copied", 3)
+    end,
+})
+
+UtilityTab:CreateButton({
+    Name = "Copy BoostLab YouTube",
+    Callback = function()
+        pcall(function()
+            setclipboard("https://www.youtube.com/@BoostLab-dll")
+        end)
+        notify("BoostLab", "YouTube link copied", 3)
+    end,
+})
+
+UtilityTab:CreateParagraph({
+    Title = "Compatibility",
+    Content = "Boxing games vary heavily in their combat remotes and server-side rules. The hub keeps the generic client systems independent so the UI remains usable instead of relying on one game's private remote names."
+})
+
+setAntiAFK(true)
+notify("BoostLab Boxing Hub", "Loaded successfully", 3)
