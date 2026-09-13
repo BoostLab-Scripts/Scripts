@@ -236,12 +236,20 @@ local MiscTab = Window:CreateTab("Misc", 4483362458)
 -- ============================================================
 -- SHARED HELPERS
 -- ============================================================
-local TEAM_CHECK_ENABLED = true
+local VISUAL_TEAM_CHECK_ENABLED = true
+local COMBAT_TEAM_CHECK_ENABLED = true
 
 local function isSameTeam(player)
-	if not TEAM_CHECK_ENABLED then return false end
 	if not LocalPlayer.Team or not player.Team then return false end
 	return LocalPlayer.Team == player.Team
+end
+
+local function shouldHideVisualTarget(player)
+	return VISUAL_TEAM_CHECK_ENABLED and isSameTeam(player)
+end
+
+local function shouldSkipCombatTarget(player)
+	return COMBAT_TEAM_CHECK_ENABLED and isSameTeam(player)
 end
 
 -- ============================================================
@@ -316,7 +324,7 @@ end
 local function refreshAllESP()
 	for _, plr in ipairs(Players:GetPlayers()) do
 		if plr ~= LocalPlayer then
-			if espEnabled then
+			if espEnabled and not shouldHideVisualTarget(plr) then
 				createESPFor(plr)
 			else
 				destroyESPFor(plr)
@@ -359,6 +367,10 @@ RunService.RenderStepped:Connect(function()
 	local myHrp = myChar and myChar:FindFirstChild("HumanoidRootPart")
 
 	for plr, obj in pairs(espObjects) do
+		if shouldHideVisualTarget(plr) then
+			destroyESPFor(plr)
+			continue
+		end
 		local char = plr.Character
 		local hrp = char and char:FindFirstChild("HumanoidRootPart")
 		local displayColor = colorForPlayer(plr)
@@ -370,8 +382,8 @@ RunService.RenderStepped:Connect(function()
 				label.TextColor3 = displayColor
 				if namesEnabled and myHrp then
 					local dist = (hrp.Position - myHrp.Position).Magnitude
-					local teamTag = isSameTeam(plr) and " [TEAM]" or ""
-					label.Text = string.format("%s%s [%dm]", plr.Name, teamTag, math.floor(dist))
+                    local teamTag = isSameTeam(plr) and " [Team]" or ""
+                    label.Text = string.format("%s%s [%dm]", plr.Name, teamTag, math.floor(dist))
 					label.TextSize = 16 * espSizeMultiplier
 				end
 			end
@@ -418,7 +430,7 @@ end)
 Players.PlayerAdded:Connect(function(plr)
 	plr.CharacterAdded:Connect(function()
 		task.wait(0.5)
-		if espEnabled then createESPFor(plr) end
+		if espEnabled and not shouldHideVisualTarget(plr) then createESPFor(plr) end
 	end)
 end)
 
@@ -430,7 +442,7 @@ for _, plr in ipairs(Players:GetPlayers()) do
 	if plr ~= LocalPlayer then
 		plr.CharacterAdded:Connect(function()
 			task.wait(0.5)
-			if espEnabled then createESPFor(plr) end
+			if espEnabled and not shouldHideVisualTarget(plr) then createESPFor(plr) end
 		end)
 	end
 end
@@ -501,6 +513,31 @@ VisualsTab:CreateColorPicker({
 })
 
 -- ============================================================
+-- VISUAL EXTRA
+-- ============================================================
+VisualsTab:CreateSection("Visual Extra")
+
+VisualsTab:CreateToggle({
+	Name = "Team Check (Visuals)",
+	CurrentValue = true,
+	Flag = "VisualTeamCheckToggle",
+	Callback = function(value)
+		VISUAL_TEAM_CHECK_ENABLED = value
+		refreshAllESP()
+		Rayfield:Notify({
+			Title = "Visual Team Check " .. (value and "Enabled" or "Disabled"),
+			Content = value and "Teammates are excluded from ESP" or "Teammates are shown in ESP",
+			Duration = 2
+		})
+	end,
+})
+
+VisualsTab:CreateParagraph({
+	Title = "Team Labels",
+	Content = "Teammates are marked with [Team] next to their name. The label stays visible whenever that player is shown by ESP.",
+})
+
+-- ============================================================
 -- COMBAT TAB
 -- ============================================================
 CombatTab:CreateParagraph({
@@ -538,7 +575,7 @@ local currentAssistTarget = nil -- stable target selection
 local function getTargets()
 	local list = {}
 	for _, plr in ipairs(Players:GetPlayers()) do
-		if plr ~= LocalPlayer and plr.Character and not isSameTeam(plr) then
+		if plr ~= LocalPlayer and plr.Character and not shouldSkipCombatTarget(plr) then
 			local part = plr.Character:FindFirstChild(assistTargetPart)
 				or plr.Character:FindFirstChild("Head")
 				or plr.Character:FindFirstChild("HumanoidRootPart")
@@ -726,6 +763,31 @@ CombatTab:CreateSlider({
 })
 
 -- ============================================================
+-- COMBAT EXTRA
+-- ============================================================
+CombatTab:CreateSection("Combat Extra")
+
+CombatTab:CreateToggle({
+	Name = "Team Check (Combat)",
+	CurrentValue = true,
+	Flag = "CombatTeamCheckToggle",
+	Callback = function(value)
+		COMBAT_TEAM_CHECK_ENABLED = value
+		currentAssistTarget = nil
+		Rayfield:Notify({
+			Title = "Combat Team Check " .. (value and "Enabled" or "Disabled"),
+			Content = value and "Aim Assist ignores teammates" or "Aim Assist can target teammates",
+			Duration = 2
+		})
+	end,
+})
+
+CombatTab:CreateParagraph({
+	Title = "Target Filtering",
+	Content = "This setting only controls team filtering for Aim Assist. Visual team filtering is controlled separately in Visuals > Visual Extra.",
+})
+
+-- ============================================================
 -- MOVEMENT TAB
 -- ============================================================
 MovementTab:CreateParagraph({
@@ -869,21 +931,93 @@ MovementTab:CreateToggle({
 		infiniteJumpEnabled = value
 	end,
 })
+local noFallDamageEnabled = false
+local noFallDamageConnections = {}
+local noFallDamageCharacterConnection
+local noFallDamageHealthBeforeFall = nil
+local noFallDamageWasFalling = false
+
+local function disconnectNoFallDamage()
+	for _, connection in ipairs(noFallDamageConnections) do
+		pcall(function() connection:Disconnect() end)
+	end
+	table.clear(noFallDamageConnections)
+
+	if noFallDamageCharacterConnection then
+		pcall(function() noFallDamageCharacterConnection:Disconnect() end)
+		noFallDamageCharacterConnection = nil
+	end
+end
+
+local function setupNoFallDamageCharacter(char)
+	if not noFallDamageEnabled then return end
+
+	disconnectNoFallDamage()
+
+	local humanoid = char:WaitForChild("Humanoid", 5)
+	local root = char:WaitForChild("HumanoidRootPart", 5)
+	if not humanoid or not root then return end
+
+	noFallDamageHealthBeforeFall = humanoid.Health
+	noFallDamageWasFalling = false
+
+	table.insert(noFallDamageConnections, humanoid.StateChanged:Connect(function(_, newState)
+		if not noFallDamageEnabled then return end
+
+		if newState == Enum.HumanoidStateType.Freefall
+			or newState == Enum.HumanoidStateType.FallingDown then
+			if not noFallDamageWasFalling then
+				noFallDamageHealthBeforeFall = humanoid.Health
+			end
+			noFallDamageWasFalling = true
+
+		elseif noFallDamageWasFalling
+			and (newState == Enum.HumanoidStateType.Landed
+				or newState == Enum.HumanoidStateType.Running
+				or newState == Enum.HumanoidStateType.RunningNoPhysics) then
+
+			-- Restore only damage that happened during the fall.
+			if noFallDamageHealthBeforeFall
+				and humanoid.Health < noFallDamageHealthBeforeFall
+				and humanoid.Health > 0 then
+				humanoid.Health = math.min(humanoid.MaxHealth, noFallDamageHealthBeforeFall)
+			end
+
+			noFallDamageWasFalling = false
+			noFallDamageHealthBeforeFall = humanoid.Health
+		end
+	end))
+
+	table.insert(noFallDamageConnections, humanoid.HealthChanged:Connect(function(health)
+		if not noFallDamageEnabled or not noFallDamageWasFalling then return end
+
+		-- Keep the pre-fall health as the reference while airborne.
+		-- This avoids interfering with normal damage outside a fall.
+		if noFallDamageHealthBeforeFall and health > noFallDamageHealthBeforeFall then
+			noFallDamageHealthBeforeFall = health
+		end
+	end))
+end
+
 MovementTab:CreateToggle({
 	Name = "No Fall Damage",
 	CurrentValue = false,
 	Flag = "NoFallDamageToggle",
 	Callback = function(value)
-		local char = LocalPlayer.Character
-		local humanoid = char and char:FindFirstChildOfClass("Humanoid")
-		if humanoid then
-			if value then
-				humanoid:SetStateEnabled(Enum.HumanoidStateType.FallingDown, false)
-				humanoid:SetStateEnabled(Enum.HumanoidStateType.Ragdoll, false)
-			else
-				humanoid:SetStateEnabled(Enum.HumanoidStateType.FallingDown, true)
-				humanoid:SetStateEnabled(Enum.HumanoidStateType.Ragdoll, true)
+		noFallDamageEnabled = value
+		disconnectNoFallDamage()
+
+		if value then
+			local char = LocalPlayer.Character
+			if char then
+				task.spawn(setupNoFallDamageCharacter, char)
 			end
+			noFallDamageCharacterConnection = LocalPlayer.CharacterAdded:Connect(function(char)
+				task.spawn(setupNoFallDamageCharacter, char)
+			end)
+		else
+			noFallDamageWasFalling = false
+			noFallDamageHealthBeforeFall = nil
 		end
 	end,
 })
@@ -1089,21 +1223,724 @@ MiscTab:CreateToggle({
 
 startAntiAfk()
 
+MiscTab:CreateSection("Security & Control")
+
+-- Moderator Protection:
+-- Local-only safeguards that reduce accidental exposure to common
+-- moderator/admin UI indicators and provide a quick unload action.
+local moderatorProtection = false
+local moderatorConnections = {}
+
+local function disconnectModeratorProtection()
+	for _, connection in ipairs(moderatorConnections) do
+		pcall(function() connection:Disconnect() end)
+	end
+	table.clear(moderatorConnections)
+end
+
+local function applyModeratorProtection()
+	disconnectModeratorProtection()
+
+	-- Hide common moderator/admin markers if a game creates them locally.
+	local function inspect(obj)
+		if not moderatorProtection then return end
+		if not obj:IsA("GuiObject") then return end
+
+		local lowerName = string.lower(obj.Name)
+		local suspicious = lowerName:find("moderator")
+			or lowerName:find("mod")
+			or lowerName:find("admin")
+			or lowerName:find("staff")
+
+		if suspicious and obj ~= nil then
+			pcall(function()
+				obj.Visible = false
+			end)
+		end
+	end
+
+	local playerGui = LocalPlayer:FindFirstChildOfClass("PlayerGui")
+	if playerGui then
+		for _, obj in ipairs(playerGui:GetDescendants()) do
+			inspect(obj)
+		end
+
+		table.insert(moderatorConnections, playerGui.DescendantAdded:Connect(function(obj)
+			task.defer(function()
+				inspect(obj)
+			end)
+		end))
+	end
+
+	table.insert(moderatorConnections, LocalPlayer.CharacterAdded:Connect(function()
+		task.wait(0.5)
+		if moderatorProtection then
+			applyModeratorProtection()
+		end
+	end))
+end
+
+MiscTab:CreateToggle({
+	Name = "Moderator Protection",
+	CurrentValue = false,
+	Flag = "ModeratorProtectionToggle",
+	Callback = function(value)
+		moderatorProtection = value
+		if value then
+			applyModeratorProtection()
+			Rayfield:Notify({
+				Title = "Moderator Protection",
+				Content = "Local protection enabled.",
+				Duration = 3
+			})
+		else
+			disconnectModeratorProtection()
+			Rayfield:Notify({
+				Title = "Moderator Protection",
+				Content = "Local protection disabled.",
+				Duration = 2
+			})
+		end
+	end,
+})
+
+local function unloadBoostLab()
+	-- Stop our own connections/features.
+	pcall(function() stopFly() end)
+	pcall(function() stopNoclip() end)
+	pcall(function() disconnectModeratorProtection() end)
+	pcall(function() restoreUltimate() end)
+	pcall(function() disableFPSBooster() end)
+
+	-- Hide ESP objects.
+	for player in pairs(espObjects) do
+		pcall(function() destroyESPFor(player) end)
+	end
+
+	-- Hide FOV.
+	pcall(function() fovCircle.Visible = false end)
+
+	-- Disconnect every connection we created where references are available.
+	pcall(function()
+		if antiAfkConnection then
+			antiAfkConnection:Disconnect()
+			antiAfkConnection = nil
+		end
+	end)
+
+	-- Destroy the Rayfield GUI.
+	pcall(function()
+		if Window then
+			Rayfield:Destroy()
+		end
+	end)
+
+	-- Remove any remaining BoostLab ScreenGui instances.
+	local playerGui = LocalPlayer:FindFirstChildOfClass("PlayerGui")
+	if playerGui then
+		for _, gui in ipairs(playerGui:GetChildren()) do
+			if gui.Name == "BoostLab" or gui.Name == "BoostLabIntro" then
+				pcall(function() gui:Destroy() end)
+			end
+		end
+	end
+end
+
+MiscTab:CreateButton({
+	Name = "Unload Script",
+	Callback = function()
+		unloadBoostLab()
+	end,
+})
+
+
 -- ============================================================
 -- MISC TAB
 -- ============================================================
-MiscTab:CreateSection("Community")
+MiscTab:CreateSection("Performance")
+
+-- FPS counter: compact purple display, slightly below the top-right edge.
+local fpsGui = Instance.new("ScreenGui")
+fpsGui.Name = "BoostLabFPS"
+fpsGui.ResetOnSpawn = false
+fpsGui.IgnoreGuiInset = true
+fpsGui.DisplayOrder = 1000
+fpsGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
+
+local fpsLabel = Instance.new("TextLabel")
+fpsLabel.AnchorPoint = Vector2.new(1, 0)
+fpsLabel.Position = UDim2.new(1, -18, 0, 42)
+fpsLabel.Size = UDim2.new(0, 115, 0, 28)
+fpsLabel.BackgroundTransparency = 1
+fpsLabel.Text = "FPS: --"
+fpsLabel.Font = Enum.Font.GothamBold
+fpsLabel.TextSize = 17
+fpsLabel.TextColor3 = Color3.fromRGB(190, 80, 255)
+fpsLabel.TextStrokeTransparency = 0.45
+fpsLabel.TextXAlignment = Enum.TextXAlignment.Right
+fpsLabel.Parent = fpsGui
+
+local fpsEnabled = true
+local fpsFrames = 0
+local fpsElapsed = 0
+
+RunService.RenderStepped:Connect(function(dt)
+	if not fpsEnabled then return end
+	fpsFrames += 1
+	fpsElapsed += dt
+	if fpsElapsed >= 0.5 then
+		local fps = math.floor((fpsFrames / fpsElapsed) + 0.5)
+		fpsLabel.Text = "FPS: " .. tostring(fps)
+		fpsFrames = 0
+		fpsElapsed = 0
+	end
+end)
 
 MiscTab:CreateToggle({
-	Name = "Team Check (hide/exclude teammates)",
+	Name = "FPS Anzeige",
 	CurrentValue = true,
-	Flag = "TeamCheckToggle",
+	Flag = "FPSDisplayToggle",
 	Callback = function(value)
-		TEAM_CHECK_ENABLED = value
-		refreshAllESP()
-		Rayfield:Notify({ Title = "Team Check " .. (value and "Enabled" or "Disabled"), Content = "", Duration = 2 })
+		fpsEnabled = value
+		fpsLabel.Visible = value
+		if value then
+			fpsFrames = 0
+			fpsElapsed = 0
+		end
 	end,
 })
+
+-- Reversible local performance mode.
+-- It reduces visual overhead without permanently deleting game instances.
+local fpsBoosterEnabled = false
+local savedVisualState = {}
+local savedLightingState = {}
+local savedEffectsState = {}
+
+local function saveOnce(key, value)
+	if savedVisualState[key] == nil then
+		savedVisualState[key] = value
+	end
+end
+
+local function enableFPSBooster()
+	if fpsBoosterEnabled then return end
+	fpsBoosterEnabled = true
+
+	local Lighting = game:GetService("Lighting")
+	savedLightingState.Brightness = Lighting.Brightness
+	savedLightingState.GlobalShadows = Lighting.GlobalShadows
+	savedLightingState.FogEnd = Lighting.FogEnd
+
+	Lighting.GlobalShadows = false
+	Lighting.FogEnd = 100000
+
+	for _, obj in ipairs(Lighting:GetChildren()) do
+		if obj:IsA("PostEffect") then
+			savedEffectsState[obj] = obj.Enabled
+			obj.Enabled = false
+		end
+	end
+
+	for _, obj in ipairs(workspace:GetDescendants()) do
+		if obj:IsA("BasePart") then
+			saveOnce(obj, {
+				Material = obj.Material,
+				Reflectance = obj.Reflectance,
+				CastShadow = obj.CastShadow
+			})
+			obj.Material = Enum.Material.SmoothPlastic
+			obj.Reflectance = 0
+			obj.CastShadow = false
+		elseif obj:IsA("Decal") or obj:IsA("Texture") then
+			saveOnce(obj, {Transparency = obj.Transparency})
+			obj.Transparency = 1
+		elseif obj:IsA("ParticleEmitter") or obj:IsA("Trail") or obj:IsA("Beam") then
+			saveOnce(obj, {Enabled = obj.Enabled})
+			obj.Enabled = false
+		elseif obj:IsA("Highlight") then
+			saveOnce(obj, {Enabled = obj.Enabled})
+			obj.Enabled = false
+		end
+	end
+end
+
+local function disableFPSBooster()
+	if not fpsBoosterEnabled then return end
+	fpsBoosterEnabled = false
+
+	local Lighting = game:GetService("Lighting")
+	if savedLightingState.Brightness ~= nil then Lighting.Brightness = savedLightingState.Brightness end
+	if savedLightingState.GlobalShadows ~= nil then Lighting.GlobalShadows = savedLightingState.GlobalShadows end
+	if savedLightingState.FogEnd ~= nil then Lighting.FogEnd = savedLightingState.FogEnd end
+
+	for obj, state in pairs(savedEffectsState) do
+		if obj and obj.Parent then obj.Enabled = state end
+	end
+
+	for obj, state in pairs(savedVisualState) do
+		if obj and obj.Parent then
+			if obj:IsA("BasePart") then
+				obj.Material = state.Material
+				obj.Reflectance = state.Reflectance
+				obj.CastShadow = state.CastShadow
+			elseif obj:IsA("Decal") or obj:IsA("Texture") then
+				obj.Transparency = state.Transparency
+			elseif obj:IsA("ParticleEmitter") or obj:IsA("Trail") or obj:IsA("Beam") or obj:IsA("Highlight") then
+				obj.Enabled = state.Enabled
+			end
+		end
+	end
+
+	table.clear(savedVisualState)
+	table.clear(savedLightingState)
+	table.clear(savedEffectsState)
+end
+
+MiscTab:CreateToggle({
+	Name = "FPS Booster",
+	CurrentValue = false,
+	Flag = "FPSBoosterToggle",
+	Callback = function(value)
+		if value then
+			enableFPSBooster()
+			task.defer(function()
+				if UltimateToggle and not ultimateFPS then
+					UltimateToggle:Set(true)
+				end
+			end)
+		else
+			if UltimateToggle and ultimateFPS then
+				UltimateToggle:Set(false)
+			end
+			disableFPSBooster()
+		end
+		Rayfield:Notify({
+			Title = "FPS Booster " .. (value and "Enabled" or "Disabled"),
+			Content = value and "Textures, effects, shadows and detail were reduced locally" or "Original visual settings restored",
+			Duration = 3
+		})
+	end,
+})
+
+MiscTab:CreateParagraph({
+	Title = "Performance Mode",
+	Content = "FPS Booster lowers local visual detail: textures/decals, particles, beams, trails, highlights, shadows and materials. It is reversible and does not delete game objects.",
+})
+
+MiscTab:CreateSection("Ultimate Performance")
+
+-- ============================================================
+-- ULTIMATE FPS ENGINE
+-- Local-only, reversible render optimization.
+-- Gameplay-critical models, tools and interactive objects are protected.
+-- ============================================================
+
+local ultimateFPS = false
+local ultimateRemoved = 0
+local ultimateOriginalParents = {}
+local ultimateStates = {}
+local ultimateConnections = {}
+local ultimateHiddenGuis = {}
+local ultimateLightingState = {}
+local ultimateSkyParents = {}
+local ultimateQualityState = {}
+local ultimateBlockNewObjects = true
+local ultimateKnownWorkspaceRoots = {}
+local ultimateBlockedObjects = {}
+
+local function ultimateProtected(obj)
+	if not obj then return true end
+	local char = LocalPlayer.Character
+	if char and obj:IsDescendantOf(char) then return true end
+	if obj:GetAttribute("BoostLabKeep") == true or obj:GetAttribute("NoRemove") == true then return true end
+	if obj:IsA("Terrain") then return true end
+
+	local model = obj:FindFirstAncestorOfClass("Model")
+	if model then
+		if model:FindFirstChildOfClass("Humanoid") then return true end
+		if model:FindFirstChildOfClass("Tool") then return true end
+	end
+	return false
+end
+
+local function ultimateTinyDecoration(part)
+	if not part:IsA("BasePart") or ultimateProtected(part) then return false end
+
+	local size = part.Size
+	local volume = size.X * size.Y * size.Z
+
+	-- Very small visual clutter only.
+	if volume > 1.5 or math.max(size.X, size.Y, size.Z) > 2 then return false end
+
+	-- Never remove anything that participates in normal gameplay physics.
+	if part.CanCollide or part.CanTouch or part.CanQuery then return false end
+
+	for _, child in ipairs(part:GetChildren()) do
+		if child:IsA("WeldConstraint") or child:IsA("Weld")
+			or child:IsA("Motor6D") or child:IsA("ClickDetector")
+			or child:IsA("ProximityPrompt") or child:IsA("TouchTransmitter") then
+			return false
+		end
+	end
+
+	local ok, connected = pcall(function()
+		return part:GetConnectedParts(true)
+	end)
+	if ok and #connected > 1 then return false end
+
+	return true
+end
+
+local function ultimateSave(obj, state)
+	if ultimateStates[obj] == nil then
+		ultimateStates[obj] = state
+	end
+end
+
+local function ultimateHideGui(obj)
+	if obj:GetAttribute("BoostLabKeep") == true then return end
+
+	if obj:IsA("GuiObject") and obj.Visible then
+		ultimateHiddenGuis[obj] = true
+		obj.Visible = false
+	elseif obj:IsA("BillboardGui") or obj:IsA("SurfaceGui") then
+		if obj.Enabled then
+			ultimateHiddenGuis[obj] = true
+			obj.Enabled = false
+		end
+	end
+end
+
+local function ultimateHideLighting()
+	local Lighting = game:GetService("Lighting")
+
+	ultimateLightingState = {
+		GlobalShadows = Lighting.GlobalShadows,
+		Brightness = Lighting.Brightness,
+		FogEnd = Lighting.FogEnd,
+		EnvironmentDiffuseScale = Lighting.EnvironmentDiffuseScale,
+		EnvironmentSpecularScale = Lighting.EnvironmentSpecularScale,
+		ExposureCompensation = Lighting.ExposureCompensation,
+	}
+
+	Lighting.GlobalShadows = false
+	Lighting.Brightness = 0
+	Lighting.FogEnd = 1000000
+	Lighting.EnvironmentDiffuseScale = 0
+	Lighting.EnvironmentSpecularScale = 0
+	Lighting.ExposureCompensation = 0
+
+	for _, child in ipairs(Lighting:GetChildren()) do
+		if child:IsA("Sky") then
+			ultimateSkyParents[child] = child.Parent
+			child.Parent = nil
+		elseif child:IsA("PostEffect") then
+			ultimateSave(child, {Enabled = child.Enabled})
+			child.Enabled = false
+		end
+	end
+end
+
+local function ultimateRestoreLighting()
+	local Lighting = game:GetService("Lighting")
+
+	for sky, parent in pairs(ultimateSkyParents) do
+		if sky and not sky.Parent then
+			pcall(function() sky.Parent = parent or Lighting end)
+		end
+	end
+	table.clear(ultimateSkyParents)
+
+	for property, value in pairs(ultimateLightingState) do
+		pcall(function() Lighting[property] = value end)
+	end
+	table.clear(ultimateLightingState)
+end
+
+local function ultimateRememberWorkspaceRoots()
+	table.clear(ultimateKnownWorkspaceRoots)
+	for _, child in ipairs(workspace:GetChildren()) do
+		ultimateKnownWorkspaceRoots[child] = true
+	end
+end
+
+local function ultimateCanBlockNewObject(obj)
+	if not ultimateBlockNewObjects or not obj then return false end
+	if ultimateProtected(obj) then return false end
+	if obj:IsA("Terrain") then return false end
+
+	-- Only block clearly visual-only roots. Interactive/gameplay roots stay alive.
+	local hasVisual = false
+	local hasInteractive = false
+
+	local function inspect(item)
+		if item:IsA("BasePart") then
+			hasVisual = true
+			if item.CanCollide or item.CanTouch or item.CanQuery then
+				hasInteractive = true
+			end
+		elseif item:IsA("Decal") or item:IsA("Texture")
+			or item:IsA("ParticleEmitter") or item:IsA("Trail")
+			or item:IsA("Beam") or item:IsA("Smoke") or item:IsA("Fire")
+			or item:IsA("Sparkles") or item:IsA("Highlight")
+			or item:IsA("BillboardGui") or item:IsA("SurfaceGui") then
+			hasVisual = true
+		elseif item:IsA("ProximityPrompt") or item:IsA("ClickDetector")
+			or item:IsA("Tool") or item:IsA("Humanoid") then
+			hasInteractive = true
+		end
+	end
+
+	inspect(obj)
+	for _, item in ipairs(obj:GetDescendants()) do
+		if item:IsA("Humanoid") or item:IsA("Tool") then
+			return false
+		end
+		inspect(item)
+	end
+
+	return hasVisual and not hasInteractive
+end
+
+local function ultimateBlockNewWorkspaceRoot(obj)
+	if not ultimateBlockNewObjects or not obj or not obj.Parent then return end
+	if obj.Parent ~= workspace then return end
+	if ultimateKnownWorkspaceRoots[obj] then return end
+	if not ultimateCanBlockNewObject(obj) then return end
+
+	-- Keep a reference so disabling Ultimate can restore the object.
+	ultimateBlockedObjects[obj] = true
+	ultimateOriginalParents[obj] = workspace
+	obj.Parent = nil
+	ultimateRemoved += 1
+end
+
+local function ultimateOptimize(obj)
+	if not obj or ultimateProtected(obj) then return end
+
+	if obj:IsA("BasePart") then
+		if ultimateTinyDecoration(obj) then
+			ultimateOriginalParents[obj] = obj.Parent
+			obj.Parent = nil
+			ultimateRemoved += 1
+			return
+		end
+
+		ultimateSave(obj, {
+			Material = obj.Material,
+			Reflectance = obj.Reflectance,
+			CastShadow = obj.CastShadow,
+		})
+		obj.Material = Enum.Material.SmoothPlastic
+		obj.Reflectance = 0
+		obj.CastShadow = false
+
+	elseif obj:IsA("Decal") or obj:IsA("Texture") then
+		ultimateSave(obj, {Transparency = obj.Transparency})
+		obj.Transparency = 1
+
+	elseif obj:IsA("ParticleEmitter") or obj:IsA("Trail")
+		or obj:IsA("Beam") or obj:IsA("Smoke")
+		or obj:IsA("Fire") or obj:IsA("Sparkles")
+		or obj:IsA("Highlight") then
+
+		ultimateSave(obj, {Enabled = obj.Enabled})
+		obj.Enabled = false
+		ultimateRemoved += 1
+
+	elseif obj:IsA("BillboardGui") or obj:IsA("SurfaceGui") then
+		ultimateHideGui(obj)
+	end
+end
+
+local function ultimateOptimizeWorld()
+	for _, obj in ipairs(workspace:GetDescendants()) do
+		ultimateOptimize(obj)
+	end
+end
+
+local function ultimateStartConnections()
+	for _, c in ipairs(ultimateConnections) do
+		pcall(function() c:Disconnect() end)
+	end
+	table.clear(ultimateConnections)
+
+	table.insert(ultimateConnections, workspace.DescendantAdded:Connect(function(obj)
+		if not ultimateFPS then return end
+
+		task.defer(function()
+			if not ultimateFPS or not obj or not obj.Parent then return end
+
+			-- If a completely new top-level Workspace object appears,
+			-- block it locally before it can become part of the rendered world.
+		if obj.Parent == workspace then
+				ultimateBlockNewWorkspaceRoot(obj)
+				return
+			end
+
+			-- For content inside an existing protected/gameplay root,
+			-- only apply render optimizations.
+			if obj.Parent then
+				ultimateOptimize(obj)
+			end
+		end)
+	end))
+
+	-- PlayerGui is intentionally not modified by Ultimate.
+	-- The game's UI remains visible while this mode is active.
+end
+
+local function ultimateStopConnections()
+	for _, c in ipairs(ultimateConnections) do
+		pcall(function() c:Disconnect() end)
+	end
+	table.clear(ultimateConnections)
+end
+
+local function ultimateHideAllGui()
+	local pg = LocalPlayer:FindFirstChildOfClass("PlayerGui")
+	if not pg then return end
+	for _, obj in ipairs(pg:GetDescendants()) do
+		ultimateHideGui(obj)
+	end
+end
+
+local function ultimateRestoreGui()
+	for obj, state in pairs(ultimateHiddenGuis) do
+		if obj and obj.Parent then
+			pcall(function()
+				if obj:IsA("GuiObject") then
+					obj.Visible = state
+				elseif obj:IsA("BillboardGui") or obj:IsA("SurfaceGui") then
+					obj.Enabled = state
+				end
+			end)
+		end
+	end
+	table.clear(ultimateHiddenGuis)
+end
+
+local function enableUltimateFPS()
+	if ultimateFPS then return end
+	ultimateFPS = true
+	ultimateRemoved = 0
+
+	-- Normal booster is always part of Ultimate mode.
+	if not fpsBoosterEnabled then
+		enableFPSBooster()
+	end
+
+	-- UI stays visible in Ultimate mode.
+	-- Remember everything that already exists so only NEW
+	-- Workspace roots are blocked after activation.
+	ultimateRememberWorkspaceRoots()
+	ultimateHideLighting()
+	ultimateOptimizeWorld()
+	ultimateStartConnections()
+
+	Rayfield:Notify({
+		Title = "Ultimate FPS Booster",
+		Content = "Extreme local render optimization enabled. Hidden/optimized: " .. tostring(ultimateRemoved) .. " effects/objects.",
+		Duration = 4
+	})
+end
+
+local function restoreUltimate()
+	ultimateFPS = false
+	ultimateStopConnections()
+	ultimateRestoreLighting()
+
+	for obj, parent in pairs(ultimateOriginalParents) do
+		if obj and not obj.Parent and parent then
+			pcall(function() obj.Parent = parent end)
+		end
+	end
+	table.clear(ultimateOriginalParents)
+	table.clear(ultimateBlockedObjects)
+	table.clear(ultimateKnownWorkspaceRoots)
+
+	for obj, state in pairs(ultimateStates) do
+		if obj and obj.Parent then
+			pcall(function()
+				if state.Material then
+					obj.Material = state.Material
+					obj.Reflectance = state.Reflectance
+					obj.CastShadow = state.CastShadow
+				elseif state.Transparency ~= nil then
+					obj.Transparency = state.Transparency
+				elseif state.Enabled ~= nil then
+					obj.Enabled = state.Enabled
+				end
+			end)
+		end
+	end
+	table.clear(ultimateStates)
+	ultimateRemoved = 0
+end
+
+local function disableUltimateFPS()
+	if not ultimateFPS then return end
+	restoreUltimate()
+
+	Rayfield:Notify({
+		Title = "Ultimate FPS Booster",
+		Content = "Original locally changed visuals restored.",
+		Duration = 3
+	})
+end
+
+local UltimateSection = MiscTab:CreateSection("Ultimate FPS Booster")
+
+MiscTab:CreateParagraph({
+	Title = "Extreme Mode",
+	Content = "Extreme local render mode. Your UI stays visible while the sky, post effects, shadows, textures, particles and tiny decorative clutter are optimized. New top-level Workspace objects can be blocked locally so newly spawned world content is not rendered.",
+})
+
+local UltimateToggle = MiscTab:CreateToggle({
+	Name = "Ultimate FPS Booster",
+	CurrentValue = false,
+	Flag = "UltimateFPSBoosterToggle",
+	Callback = function(value)
+		if value then
+			enableUltimateFPS()
+		else
+			disableUltimateFPS()
+		end
+	end,
+})
+
+MiscTab:CreateToggle({
+	Name = "Block New World Objects",
+	CurrentValue = true,
+	Flag = "UltimateBlockNewObjectsToggle",
+	Callback = function(value)
+		ultimateBlockNewObjects = value
+		if ultimateFPS and value then
+			ultimateRememberWorkspaceRoots()
+		end
+	end,
+})
+
+MiscTab:CreateButton({
+	Name = "Reapply Ultimate Cleanup",
+	Callback = function()
+		if ultimateFPS then
+			ultimateRememberWorkspaceRoots()
+			ultimateOptimizeWorld()
+			Rayfield:Notify({Title = "Ultimate Cleanup", Content = "Loaded world optimized again. UI remains visible.", Duration = 2})
+		else
+			Rayfield:Notify({Title = "Ultimate Cleanup", Content = "Enable Ultimate FPS Booster first.", Duration = 2})
+		end
+	end,
+})
+
+MiscTab:CreateParagraph({
+	Title = "Protected",
+	Content = "Your character, humanoid/tool models, interactive physics parts, Terrain and objects marked BoostLabKeep/NoRemove are protected. New world roots can be blocked locally and restored when Ultimate is disabled.",
+})
+
+MiscTab:CreateSection("Community")
 
 MiscTab:CreateParagraph({
 	Title = "BoostLab Community",
