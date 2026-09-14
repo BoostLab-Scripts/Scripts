@@ -1,0 +1,2697 @@
+-- ============================================================
+-- BoostLab - Game Tools
+-- LocalScript - place in StarterPlayerScripts or StarterGui
+-- Available to every player who joins
+-- ============================================================
+
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
+local TweenService = game:GetService("TweenService")
+local LocalPlayer = Players.LocalPlayer
+local Camera = workspace.CurrentCamera
+
+-- ==== CONFIG ====
+local ENEMY_FOLDER_NAME = "Enemies" -- NPC folder for aim assist targeting
+
+-- ============================================================
+-- INTRO ANIMATION - BoostLab polished startup
+-- ============================================================
+local function playIntro()
+	local playerGui = LocalPlayer:WaitForChild("PlayerGui")
+	local old = playerGui:FindFirstChild("BoostLabIntro")
+	if old then old:Destroy() end
+
+	local gui = Instance.new("ScreenGui")
+	gui.Name = "BoostLabIntro"
+	gui.IgnoreGuiInset = true
+	gui.ResetOnSpawn = false
+	gui.DisplayOrder = 99999
+	gui.Parent = playerGui
+
+	local root = Instance.new("Frame")
+	root.Size = UDim2.fromScale(1, 1)
+	root.BackgroundColor3 = Color3.fromRGB(4, 2, 9)
+	root.BorderSizePixel = 0
+	root.Parent = gui
+
+	local bgGradient = Instance.new("UIGradient")
+	bgGradient.Color = ColorSequence.new({
+		ColorSequenceKeypoint.new(0, Color3.fromRGB(5, 2, 12)),
+		ColorSequenceKeypoint.new(0.48, Color3.fromRGB(31, 7, 54)),
+		ColorSequenceKeypoint.new(1, Color3.fromRGB(4, 2, 10)),
+	})
+	bgGradient.Rotation = 35
+	bgGradient.Parent = root
+
+	local glow = Instance.new("Frame")
+	glow.AnchorPoint = Vector2.new(0.5, 0.5)
+	glow.Position = UDim2.fromScale(0.5, 0.43)
+	glow.Size = UDim2.fromScale(0.18, 0.18)
+	glow.BackgroundColor3 = Color3.fromRGB(170, 55, 255)
+	glow.BackgroundTransparency = 0.74
+	glow.BorderSizePixel = 0
+	glow.Parent = root
+	local glowCorner = Instance.new("UICorner")
+	glowCorner.CornerRadius = UDim.new(1, 0)
+	glowCorner.Parent = glow
+	local glowScale = Instance.new("UIScale")
+	glowScale.Scale = 0.7
+	glowScale.Parent = glow
+
+	local rings = {}
+	for i = 1, 3 do
+		local ring = Instance.new("Frame")
+		ring.AnchorPoint = Vector2.new(0.5, 0.5)
+		ring.Position = UDim2.fromScale(0.5, 0.43)
+		ring.Size = UDim2.fromScale(0.17 + i * 0.045, 0.17 + i * 0.045)
+		ring.BackgroundTransparency = 1
+		ring.BorderSizePixel = 0
+		ring.Parent = root
+
+		local stroke = Instance.new("UIStroke")
+		stroke.Color = Color3.fromRGB(176, 65, 245)
+		stroke.Transparency = 0.55 + i * 0.1
+		stroke.Thickness = 1.5
+		stroke.Parent = ring
+
+		local corner = Instance.new("UICorner")
+		corner.CornerRadius = UDim.new(1, 0)
+		corner.Parent = ring
+		rings[i] = ring
+	end
+
+	local logo = Instance.new("TextLabel")
+	logo.AnchorPoint = Vector2.new(0.5, 0.5)
+	logo.Position = UDim2.fromScale(0.5, 0.43)
+	logo.Size = UDim2.fromScale(0.62, 0.14)
+	logo.BackgroundTransparency = 1
+	logo.Text = "BOOSTLAB"
+	logo.Font = Enum.Font.GothamBlack
+	logo.TextScaled = true
+	logo.TextColor3 = Color3.fromRGB(250, 241, 255)
+	logo.TextStrokeColor3 = Color3.fromRGB(154, 45, 235)
+	logo.TextStrokeTransparency = 0.25
+	logo.TextTransparency = 1
+	logo.Parent = root
+
+	local sub = Instance.new("TextLabel")
+	sub.AnchorPoint = Vector2.new(0.5, 0.5)
+	sub.Position = UDim2.fromScale(0.5, 0.535)
+	sub.Size = UDim2.fromScale(0.55, 0.045)
+	sub.BackgroundTransparency = 1
+	sub.Text = "INITIALIZING  •  GAME TOOLS"
+	sub.Font = Enum.Font.GothamMedium
+	sub.TextScaled = true
+	sub.TextColor3 = Color3.fromRGB(205, 177, 225)
+	sub.TextTransparency = 1
+	sub.Parent = root
+
+	local status = Instance.new("TextLabel")
+	status.AnchorPoint = Vector2.new(0.5, 0.5)
+	status.Position = UDim2.fromScale(0.5, 0.59)
+	status.Size = UDim2.fromScale(0.5, 0.035)
+	status.BackgroundTransparency = 1
+	status.Text = "Loading modules..."
+	status.Font = Enum.Font.Gotham
+	status.TextScaled = true
+	status.TextColor3 = Color3.fromRGB(167, 133, 190)
+	status.TextTransparency = 1
+	status.Parent = root
+
+	local track = Instance.new("Frame")
+	track.AnchorPoint = Vector2.new(0.5, 0.5)
+	track.Position = UDim2.fromScale(0.5, 0.67)
+	track.Size = UDim2.fromScale(0.34, 0.009)
+	track.BackgroundColor3 = Color3.fromRGB(45, 25, 58)
+	track.BackgroundTransparency = 0.2
+	track.BorderSizePixel = 0
+	track.Parent = root
+	local trackCorner = Instance.new("UICorner")
+	trackCorner.CornerRadius = UDim.new(1, 0)
+	trackCorner.Parent = track
+
+	local fill = Instance.new("Frame")
+	fill.Size = UDim2.new(0, 0, 1, 0)
+	fill.BackgroundColor3 = Color3.fromRGB(196, 76, 255)
+	fill.BorderSizePixel = 0
+	fill.Parent = track
+	local fillCorner = Instance.new("UICorner")
+	fillCorner.CornerRadius = UDim.new(1, 0)
+	fillCorner.Parent = fill
+
+	local percent = Instance.new("TextLabel")
+	percent.AnchorPoint = Vector2.new(0.5, 0.5)
+	percent.Position = UDim2.fromScale(0.5, 0.705)
+	percent.Size = UDim2.fromScale(0.12, 0.03)
+	percent.BackgroundTransparency = 1
+	percent.Text = "0%"
+	percent.Font = Enum.Font.GothamBold
+	percent.TextScaled = true
+	percent.TextColor3 = Color3.fromRGB(210, 180, 235)
+	percent.TextTransparency = 1
+	percent.Parent = root
+
+	local statuses = {
+		"Loading modules...",
+		"Preparing visuals...",
+		"Preparing movement...",
+		"Preparing controls...",
+		"BoostLab ready."
+	}
+
+	TweenService:Create(glowScale, TweenInfo.new(1.2, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {Scale = 1.35}):Play()
+	TweenService:Create(logo, TweenInfo.new(0.7, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {TextTransparency = 0}):Play()
+	local _introPulse = task.spawn(function()
+		while logo.Parent do
+			TweenService:Create(logo, TweenInfo.new(0.9, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut), {TextStrokeTransparency = 0.05, TextTransparency = 0.02}):Play()
+			task.wait(0.9)
+			TweenService:Create(logo, TweenInfo.new(0.9, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut), {TextStrokeTransparency = 0.45, TextTransparency = 0.08}):Play()
+			task.wait(0.9)
+		end
+	end)
+	task.delay(0.18, function()
+		TweenService:Create(sub, TweenInfo.new(0.55), {TextTransparency = 0.15}):Play()
+	end)
+	task.delay(0.3, function()
+		TweenService:Create(status, TweenInfo.new(0.45), {TextTransparency = 0.2}):Play()
+		TweenService:Create(percent, TweenInfo.new(0.45), {TextTransparency = 0.1}):Play()
+	end)
+
+	for i, ring in ipairs(rings) do
+		task.spawn(function()
+			local direction = (i % 2 == 0) and 1 or -1
+			while ring.Parent do
+				TweenService:Create(ring, TweenInfo.new(2.2 + i * 0.35, Enum.EasingStyle.Linear), {
+					Rotation = ring.Rotation + 360 * direction
+				}):Play()
+				task.wait(2.2 + i * 0.35)
+			end
+		end)
+	end
+
+	local duration = 2.8
+	local start = os.clock()
+	while true do
+		local alpha = math.clamp((os.clock() - start) / duration, 0, 1)
+		local eased = 1 - (1 - alpha)^3
+		fill.Size = UDim2.new(eased, 0, 1, 0)
+		percent.Text = string.format("%d%%", math.floor(eased * 100 + 0.5))
+		status.Text = statuses[math.clamp(math.floor(alpha * #statuses) + 1, 1, #statuses)]
+		if alpha >= 1 then break end
+		RunService.RenderStepped:Wait()
+	end
+
+	task.wait(0.18)
+	TweenService:Create(root, TweenInfo.new(0.6, Enum.EasingStyle.Quad, Enum.EasingDirection.In), {BackgroundTransparency = 1}):Play()
+	TweenService:Create(logo, TweenInfo.new(0.45), {TextTransparency = 1, TextStrokeTransparency = 1}):Play()
+	TweenService:Create(sub, TweenInfo.new(0.35), {TextTransparency = 1}):Play()
+	TweenService:Create(status, TweenInfo.new(0.25), {TextTransparency = 1}):Play()
+	TweenService:Create(percent, TweenInfo.new(0.25), {TextTransparency = 1}):Play()
+	TweenService:Create(track, TweenInfo.new(0.3), {BackgroundTransparency = 1}):Play()
+	TweenService:Create(glow, TweenInfo.new(0.5), {BackgroundTransparency = 1}):Play()
+	task.wait(0.65)
+	gui:Destroy()
+end
+
+playIntro()
+
+-- ============================================================
+-- RAYFIELD SETUP
+-- ============================================================
+local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
+
+local Window = Rayfield:CreateWindow({
+	Name = "BoostLab",
+	LoadingTitle = "BoostLab",
+	LoadingSubtitle = "Clean • Fast • Simple",
+	ConfigurationSaving = { Enabled = true, FolderName = "BoostLab", FileName = "Settings" },
+})
+
+local boostLabActive = true
+
+local CombatTab = Window:CreateTab("Combat", 4483362458)
+local VisualsTab = Window:CreateTab("Visuals", 4483362458)
+local MovementTab = Window:CreateTab("Movement", 4483362458)
+local FPSTab = Window:CreateTab("FPS", 4483362458)
+local BuildsTab = Window:CreateTab("Builds", 4483362458)
+local MiscTab = Window:CreateTab("Misc", 4483362458)
+
+-- ============================================================
+-- SHARED HELPERS
+-- ============================================================
+local VISUAL_TEAM_CHECK_ENABLED = true
+local COMBAT_TEAM_CHECK_ENABLED = true
+
+local function isSameTeam(player)
+	if not player or player == LocalPlayer then return false end
+
+	-- Prefer the actual Team instance.
+	if LocalPlayer.Team ~= nil and player.Team ~= nil then
+		return LocalPlayer.Team == player.Team
+	end
+
+	-- Fallback for games that only assign TeamColor.
+	if LocalPlayer.TeamColor ~= nil and player.TeamColor ~= nil then
+		return LocalPlayer.TeamColor == player.TeamColor
+	end
+
+	return false
+end
+
+local function shouldHideVisualTarget(player)
+	return VISUAL_TEAM_CHECK_ENABLED and isSameTeam(player)
+end
+
+local function shouldSkipCombatTarget(player)
+	return COMBAT_TEAM_CHECK_ENABLED and isSameTeam(player)
+end
+
+-- ============================================================
+-- VISUALS TAB
+-- ============================================================
+VisualsTab:CreateParagraph({
+	Title = "Visuals",
+	Content = "ESP tools for players and targets. Use the controls below to keep the overlay clean.",
+})
+VisualsTab:CreateSection("ESP")
+
+local espEnabled = false
+local boxesEnabled = true
+local snaplinesEnabled = true
+local namesEnabled = true
+local espColor = Color3.fromRGB(170, 60, 230)
+local espSizeMultiplier = 1 -- adjustable scale for boxes/text
+
+local espObjects = {} -- [player] = { billboard, boxDrawing, snapline }
+
+local function destroyESPFor(player)
+	local obj = espObjects[player]
+	if not obj then return end
+	if obj.billboard then obj.billboard:Destroy() end
+	if obj.boxDrawing then obj.boxDrawing:Remove() end
+	if obj.snapline then obj.snapline:Remove() end
+	espObjects[player] = nil
+end
+
+local function createESPFor(player)
+	if espObjects[player] then return end
+	local char = player.Character
+	if not char then return end
+	local hrp = char:FindFirstChild("HumanoidRootPart")
+	if not hrp then return end
+
+	local obj = {}
+
+	local billboard = Instance.new("BillboardGui")
+	billboard.Size = UDim2.new(0, 150, 0, 40)
+	billboard.StudsOffset = Vector3.new(0, 3, 0)
+	billboard.AlwaysOnTop = true
+	billboard.Parent = hrp
+
+	local label = Instance.new("TextLabel")
+	label.Size = UDim2.new(1, 0, 1, 0)
+	label.BackgroundTransparency = 1
+	label.TextColor3 = espColor
+	label.TextStrokeTransparency = 0
+	label.Font = Enum.Font.GothamBold
+	label.TextSize = 16
+	label.Text = player.Name
+	label.Parent = billboard
+	obj.billboard = billboard
+
+	local boxDrawing = Drawing.new("Square")
+	boxDrawing.Thickness = 2
+	boxDrawing.Color = espColor
+	boxDrawing.Filled = false
+	boxDrawing.Visible = false
+	obj.boxDrawing = boxDrawing
+
+	local snapline = Drawing.new("Line")
+	snapline.Thickness = 1.5
+	snapline.Color = espColor
+	snapline.Visible = false
+	obj.snapline = snapline
+
+	espObjects[player] = obj
+end
+
+local function refreshAllESP()
+	for _, plr in ipairs(Players:GetPlayers()) do
+		if plr ~= LocalPlayer then
+			if espEnabled and not shouldHideVisualTarget(plr) then
+				createESPFor(plr)
+			else
+				destroyESPFor(plr)
+			end
+		end
+	end
+end
+
+local TEAMMATE_COLOR = Color3.fromRGB(60, 220, 100)
+
+local function colorForPlayer(plr)
+	if isSameTeam(plr) then
+		return TEAMMATE_COLOR
+	end
+	return espColor
+end
+
+local function hasLineOfSight(part)
+	local character = LocalPlayer.Character
+	local origin = Camera.CFrame.Position
+	local direction = part.Position - origin
+
+	local params = RaycastParams.new()
+	params.FilterType = Enum.RaycastFilterType.Exclude
+	params.FilterDescendantsInstances = character and {character} or {}
+	params.IgnoreWater = true
+
+	local result = workspace:Raycast(origin, direction, params)
+	if not result then
+		return true
+	end
+
+	return result.Instance:IsDescendantOf(part.Parent)
+end
+
+RunService.RenderStepped:Connect(function()
+	if not espEnabled then return end
+
+	local myChar = LocalPlayer.Character
+	local myHrp = myChar and myChar:FindFirstChild("HumanoidRootPart")
+
+	for plr, obj in pairs(espObjects) do
+		if shouldHideVisualTarget(plr) then
+			destroyESPFor(plr)
+			continue
+		end
+		local char = plr.Character
+		local hrp = char and char:FindFirstChild("HumanoidRootPart")
+		local displayColor = colorForPlayer(plr)
+
+		if hrp and obj.billboard and obj.billboard.Parent then
+			local label = obj.billboard:FindFirstChildOfClass("TextLabel")
+			if label then
+				label.Visible = namesEnabled
+				label.TextColor3 = displayColor
+				if namesEnabled and myHrp then
+					local dist = (hrp.Position - myHrp.Position).Magnitude
+                    local teamTag = isSameTeam(plr) and " [Team]" or ""
+                    label.Text = string.format("%s%s [%dm]", plr.Name, teamTag, math.floor(dist))
+					label.TextSize = 16 * espSizeMultiplier
+				end
+			end
+
+			local ok, cf, size = pcall(function()
+				return char:GetBoundingBox()
+			end)
+
+			if ok and boxesEnabled then
+				local screenPos, onScreen = Camera:WorldToViewportPoint(cf.Position)
+				if onScreen then
+					local scale = math.clamp((1000 / math.max(screenPos.Z, 1)) * espSizeMultiplier, 15, 500)
+					obj.boxDrawing.Size = Vector2.new(scale * (size.X / size.Y), scale)
+					obj.boxDrawing.Position = Vector2.new(screenPos.X - obj.boxDrawing.Size.X / 2, screenPos.Y - obj.boxDrawing.Size.Y / 2)
+					obj.boxDrawing.Thickness = math.clamp(2 * espSizeMultiplier, 1, 6)
+					obj.boxDrawing.Color = displayColor
+					obj.boxDrawing.Visible = true
+				else
+					obj.boxDrawing.Visible = false
+				end
+			else
+				obj.boxDrawing.Visible = false
+			end
+
+			if snaplinesEnabled then
+				local screenPos, onScreen = Camera:WorldToViewportPoint(hrp.Position)
+				if onScreen then
+					local viewportSize = Camera.ViewportSize
+					obj.snapline.From = Vector2.new(viewportSize.X / 2, viewportSize.Y)
+					obj.snapline.To = Vector2.new(screenPos.X, screenPos.Y)
+					obj.snapline.Thickness = math.clamp(1.5 * espSizeMultiplier, 1, 4)
+					obj.snapline.Color = displayColor
+					obj.snapline.Visible = true
+				else
+					obj.snapline.Visible = false
+				end
+			else
+				obj.snapline.Visible = false
+			end
+		end
+	end
+end)
+
+Players.PlayerAdded:Connect(function(plr)
+	plr.CharacterAdded:Connect(function()
+		task.wait(0.5)
+		if espEnabled and not shouldHideVisualTarget(plr) then createESPFor(plr) end
+	end)
+end)
+
+Players.PlayerRemoving:Connect(function(plr)
+	destroyESPFor(plr)
+end)
+
+-- Team changes must immediately refresh ESP so Team Check never leaves stale boxes.
+local function watchTeam(plr)
+	if plr == LocalPlayer then return end
+	plr:GetPropertyChangedSignal("Team"):Connect(function()
+		if espEnabled then refreshAllESP() end
+	end)
+	plr:GetPropertyChangedSignal("TeamColor"):Connect(function()
+		if espEnabled then refreshAllESP() end
+	end)
+end
+
+for _, plr in ipairs(Players:GetPlayers()) do
+	watchTeam(plr)
+end
+Players.PlayerAdded:Connect(watchTeam)
+
+for _, plr in ipairs(Players:GetPlayers()) do
+	if plr ~= LocalPlayer then
+		plr.CharacterAdded:Connect(function()
+			task.wait(0.5)
+			if espEnabled and not shouldHideVisualTarget(plr) then createESPFor(plr) end
+		end)
+	end
+end
+
+VisualsTab:CreateToggle({
+	Name = "Enable ESP",
+	CurrentValue = false,
+	Flag = "ESPToggle",
+	Callback = function(value)
+		espEnabled = value
+		refreshAllESP()
+		Rayfield:Notify({ Title = "ESP " .. (value and "Enabled" or "Disabled"), Content = "", Duration = 2 })
+	end,
+})
+
+VisualsTab:CreateToggle({
+	Name = "Show Boxes",
+	CurrentValue = true,
+	Flag = "ESPBoxesToggle",
+	Callback = function(value)
+		boxesEnabled = value
+	end,
+})
+
+VisualsTab:CreateToggle({
+	Name = "Show Snaplines",
+	CurrentValue = true,
+	Flag = "ESPSnaplinesToggle",
+	Callback = function(value)
+		snaplinesEnabled = value
+	end,
+})
+
+VisualsTab:CreateToggle({
+	Name = "Show Names",
+	CurrentValue = true,
+	Flag = "ESPNamesToggle",
+	Callback = function(value)
+		namesEnabled = value
+	end,
+})
+
+VisualsTab:CreateSlider({
+	Name = "ESP Size",
+	Range = { 25, 300 },
+	Increment = 5,
+	Suffix = "%",
+	CurrentValue = 100,
+	Flag = "ESPSizeSlider",
+	Callback = function(value)
+		espSizeMultiplier = value / 100
+	end,
+})
+
+VisualsTab:CreateColorPicker({
+	Name = "ESP Color",
+	Color = espColor,
+	Flag = "ESPColorPicker",
+	Callback = function(value)
+		espColor = value
+		for _, obj in pairs(espObjects) do
+			if obj.boxDrawing then obj.boxDrawing.Color = value end
+			if obj.snapline then obj.snapline.Color = value end
+			local label = obj.billboard and obj.billboard:FindFirstChildOfClass("TextLabel")
+			if label then label.TextColor3 = value end
+		end
+	end,
+})
+
+-- ============================================================
+-- VISUAL EXTRA
+-- ============================================================
+VisualsTab:CreateSection("Visual Extra")
+
+VisualsTab:CreateToggle({
+	Name = "Team Check (Visuals)",
+	CurrentValue = true,
+	Flag = "VisualTeamCheckToggle",
+	Callback = function(value)
+		VISUAL_TEAM_CHECK_ENABLED = value
+		refreshAllESP()
+		Rayfield:Notify({
+			Title = "Visual Team Check " .. (value and "Enabled" or "Disabled"),
+			Content = value and "Teammates are excluded from ESP" or "Teammates are shown in ESP",
+			Duration = 2
+		})
+	end,
+})
+
+VisualsTab:CreateParagraph({
+	Title = "Team Labels",
+	Content = "Teammates are marked with [Team] next to their name. The label stays visible whenever that player is shown by ESP.",
+})
+
+-- ============================================================
+-- COMBAT TAB
+-- ============================================================
+CombatTab:CreateParagraph({
+	Title = "Combat",
+	Content = "Aim-assist controls with adjustable target part, strength and FOV.",
+})
+CombatTab:CreateSection("Aim Assist")
+
+local MAX_ASSIST_RANGE = 180 -- larger detection radius around crosshair
+local MAX_DISTANCE = 1500
+
+local assistEnabled = false -- feature toggle
+local assistHolding = false -- true only while right mouse button is held
+local assistStrength = 0.85 -- strong, smooth camera assistance
+local assistTargetPart = "Head" -- which body part to pull toward
+local fovCircleEnabled = true
+local wallTargetingEnabled = false
+
+-- FOV circle - visualizes the detection radius on screen
+local fovCircle = Drawing.new("Circle")
+fovCircle.Thickness = 1.5
+fovCircle.Color = Color3.fromRGB(170, 60, 230)
+fovCircle.Filled = false
+fovCircle.NumSides = 64
+fovCircle.Transparency = 0.8
+fovCircle.Visible = false
+
+-- Light aim assist targets OTHER PLAYERS (arena PvP), not just NPCs.
+-- It nudges the camera a small amount toward the nearest target near the
+-- crosshair - it does not lock on or auto-track, so players still have to
+-- aim and track manually. Strength is capped below to keep it a genuine
+-- assist rather than an aimbot.
+local MAX_STRENGTH_CAP = 1.0
+local currentAssistTarget = nil -- stable target selection
+
+local function getTargets()
+	local list = {}
+	for _, plr in ipairs(Players:GetPlayers()) do
+		if plr ~= LocalPlayer and plr.Character and not shouldSkipCombatTarget(plr) then
+			local part = plr.Character:FindFirstChild(assistTargetPart)
+				or plr.Character:FindFirstChild("Head")
+				or plr.Character:FindFirstChild("HumanoidRootPart")
+			local hum = plr.Character:FindFirstChildOfClass("Humanoid")
+			if part and hum and hum.Health > 0 then
+				table.insert(list, part)
+			end
+		end
+	end
+
+	-- Also include NPCs in the Enemies folder if present, for PvE modes
+	local folder = workspace:FindFirstChild(ENEMY_FOLDER_NAME)
+	if folder then
+		for _, model in ipairs(folder:GetChildren()) do
+			local hum = model:FindFirstChildOfClass("Humanoid")
+			if hum and hum.Health > 0 then
+				local part = model:FindFirstChild(assistTargetPart)
+					or model:FindFirstChild("Head")
+					or model:FindFirstChild("HumanoidRootPart")
+					or model.PrimaryPart
+				if part then
+					table.insert(list, part)
+				end
+			end
+		end
+	end
+
+	return list
+end
+
+local function worldToScreen(pos)
+	local screenPoint, onScreen = Camera:WorldToViewportPoint(pos)
+	return Vector2.new(screenPoint.X, screenPoint.Y), onScreen, screenPoint.Z
+end
+
+-- Right mouse button held = assist active this frame
+UserInputService.InputBegan:Connect(function(input, gameProcessed)
+	if input.UserInputType == Enum.UserInputType.MouseButton2 then
+		assistHolding = true
+	end
+end)
+
+UserInputService.InputEnded:Connect(function(input, gameProcessed)
+	if input.UserInputType == Enum.UserInputType.MouseButton2 then
+		assistHolding = false
+	end
+end)
+
+RunService.RenderStepped:Connect(function()
+	if not boostLabActive then return end
+	-- Update FOV circle regardless of whether assist is actively pulling,
+	-- so the player can always see their current detection radius.
+	if fovCircleEnabled and assistEnabled then
+		fovCircle.Position = UserInputService:GetMouseLocation()
+		fovCircle.Radius = MAX_ASSIST_RANGE
+		fovCircle.Visible = true
+	else
+		fovCircle.Visible = false
+	end
+
+	if not assistEnabled or not assistHolding or assistStrength <= 0 then
+		currentAssistTarget = nil
+		return
+	end
+
+	local mousePos = UserInputService:GetMouseLocation()
+	local targets = getTargets()
+
+	local closestPart, closestScreenDist = nil, math.huge
+
+	for _, part in ipairs(targets) do
+		local screenPos, onScreen, depth = worldToScreen(part.Position)
+		if onScreen and depth > 0 and depth < MAX_DISTANCE then
+			local screenDist = (screenPos - mousePos).Magnitude
+			if screenDist < MAX_ASSIST_RANGE and (wallTargetingEnabled or hasLineOfSight(part)) then
+				-- Prefer targets close to the crosshair, with a small distance penalty.
+				local score = screenDist + (depth / 6000)
+				if score < closestScreenDist then
+					closestScreenDist = score
+					closestPart = part
+				end
+			end
+		end
+	end
+
+	-- Hysteresis: if the currently-assisted target is still valid and roughly
+	-- as close as the new candidate, keep it - this stops the assist jittering
+	-- between two nearby targets. It does NOT keep aiming at a target that
+	-- has gone off-screen or out of range; it only smooths selection among
+	-- currently visible, in-range candidates.
+	if currentAssistTarget and currentAssistTarget.Parent then
+		local screenPos, onScreen, depth = worldToScreen(currentAssistTarget.Position)
+		if onScreen and depth > 0 and depth < MAX_DISTANCE then
+			local currentScreenDist = (screenPos - mousePos).Magnitude
+			if currentScreenDist < MAX_ASSIST_RANGE and currentScreenDist <= closestScreenDist + 6 then
+				closestPart = currentAssistTarget
+				closestScreenDist = currentScreenDist
+			end
+		end
+	end
+
+	currentAssistTarget = closestPart
+
+	if closestPart then
+		-- Small, capped nudge toward the target - proportional to how close
+		-- the crosshair already is. This helps stabilize aim without
+		-- removing the need to track the target yourself.
+		local cappedStrength = math.min(assistStrength, MAX_STRENGTH_CAP)
+		local falloff = 1 - (closestScreenDist / MAX_ASSIST_RANGE)
+		local pullAmount = math.clamp(cappedStrength * (0.35 + falloff * 0.65), 0.05, 0.55)
+
+		local camPos = Camera.CFrame.Position
+		local targetCFrame = CFrame.new(camPos, closestPart.Position)
+		local newCFrame = Camera.CFrame:Lerp(targetCFrame, pullAmount)
+		Camera.CFrame = newCFrame
+	end
+end)
+
+CombatTab:CreateToggle({
+	Name = "Target Through Walls",
+	CurrentValue = false,
+	Flag = "AimAssistWallTargeting",
+	Callback = function(value)
+		wallTargetingEnabled = value
+		Rayfield:Notify({
+			Title = "Wall Targeting " .. (value and "Enabled" or "Disabled"),
+			Content = value and "Aim Assist may select targets even when a wall blocks line of sight." or "Normal line-of-sight filtering restored.",
+			Duration = 2,
+		})
+	end,
+})
+
+CombatTab:CreateParagraph({
+	Title = "Improved Targeting",
+	Content = "Smooth target selection, visibility check and stable target retention. Hold right-click while Aim Assist is enabled.",
+})
+
+CombatTab:CreateToggle({
+	Name = "Enable Aim Assist",
+	CurrentValue = false,
+	Flag = "AimAssistToggle",
+	Callback = function(value)
+		assistEnabled = value
+		if not value then currentAssistTarget = nil end
+		Rayfield:Notify({ Title = "Aim Assist " .. (value and "Enabled" or "Disabled"), Content = "Hold right-click for a light aim nudge", Duration = 2 })
+	end,
+})
+
+CombatTab:CreateDropdown({
+	Name = "Target Part",
+	Options = { "Head", "UpperTorso", "Torso", "HumanoidRootPart" },
+	CurrentOption = { "Head" },
+	MultipleOptions = false,
+	Flag = "AimAssistTargetPart",
+	Callback = function(option)
+		assistTargetPart = option[1]
+	end,
+})
+
+CombatTab:CreateSlider({
+	Name = "Assist Strength",
+	Range = { 0, 100 },
+	Increment = 5,
+	Suffix = "%",
+	CurrentValue = 85,
+	Flag = "AimAssistStrength",
+	Callback = function(value)
+		assistStrength = value / 100
+	end,
+})
+
+CombatTab:CreateToggle({
+	Name = "Show FOV Circle",
+	CurrentValue = true,
+	Flag = "FOVCircleToggle",
+	Callback = function(value)
+		fovCircleEnabled = value
+	end,
+})
+
+CombatTab:CreateColorPicker({
+	Name = "FOV Circle Color",
+	Color = Color3.fromRGB(170, 60, 230),
+	Flag = "FOVCircleColor",
+	Callback = function(value)
+		fovCircle.Color = value
+	end,
+})
+
+CombatTab:CreateSlider({
+	Name = "Detection Radius (FOV)",
+	Range = { 25, 180 },
+	Increment = 5,
+	Suffix = "px",
+	CurrentValue = 180,
+	Flag = "AimAssistRadius",
+	Callback = function(value)
+		MAX_ASSIST_RANGE = value
+	end,
+})
+
+-- ============================================================
+-- COMBAT EXTRA
+-- ============================================================
+CombatTab:CreateSection("Combat Extra")
+
+CombatTab:CreateToggle({
+	Name = "Team Check (Combat)",
+	CurrentValue = true,
+	Flag = "CombatTeamCheckToggle",
+	Callback = function(value)
+		COMBAT_TEAM_CHECK_ENABLED = value
+		currentAssistTarget = nil
+		Rayfield:Notify({
+			Title = "Combat Team Check " .. (value and "Enabled" or "Disabled"),
+			Content = value and "Aim Assist ignores teammates" or "Aim Assist can target teammates",
+			Duration = 2
+		})
+	end,
+})
+
+CombatTab:CreateParagraph({
+	Title = "Target Filtering",
+	Content = "This setting only controls team filtering for Aim Assist. Visual team filtering is controlled separately in Visuals > Visual Extra.",
+})
+
+-- ============================================================
+-- UNIVERSAL WEAPON TOOLS
+-- ============================================================
+-- Local/client-side compatibility layer for Tool-based weapons.
+-- This does not bypass server-side weapon validation.
+
+local noRecoilEnabled = false
+local noReloadEnabled = false
+local recoilStrength = 100
+local recoilConnection = nil
+local weaponPatches = {}
+local weaponWatchConnections = {}
+local lastCameraCFrame = nil
+local lastCameraPosition = nil
+
+local RECOIL_NAMES = {
+	recoil=true, recoilstrength=true, recoil_strength=true,
+	recoilamount=true, recoil_amount=true, camerarecoil=true,
+	camera_recoil=true, camerakick=true, camera_kick=true,
+	kick=true, kickamount=true, kick_amount=true,
+	verticalrecoil=true, vertical_recoil=true, horizontalrecoil=true,
+	horizontal_recoil=true,
+}
+
+local RELOAD_NAMES = {
+	reloadtime=true, reload_time=true, reloadspeed=true, reload_speed=true,
+	reloadcooldown=true, reload_cooldown=true, reloadinterval=true, reload_interval=true,
+	reloadlength=true, reload_length=true, rechargetime=true, recharge_time=true,
+}
+
+local AMMO_NAMES = {
+	ammo=true, currentammo=true, current_ammo=true, magazineammo=true,
+	magazine_ammo=true, clipammo=true, clip_ammo=true, bullets=true,
+}
+
+local function normalizedName(name)
+	return string.lower(tostring(name or "")):gsub("[%s%-]", "_")
+end
+
+local function getEquippedTool()
+	local char = LocalPlayer.Character
+	if not char then return nil end
+	for _, obj in ipairs(char:GetChildren()) do
+		if obj:IsA("Tool") then return obj end
+	end
+	return nil
+end
+
+local function rememberPatch(obj, key, value)
+	weaponPatches[obj] = weaponPatches[obj] or {}
+	if weaponPatches[obj][key] == nil then
+		weaponPatches[obj][key] = value
+	end
+end
+
+local function patchNumberObject(obj)
+	if not obj:IsA("NumberValue") and not obj:IsA("IntValue") then return end
+	local name = normalizedName(obj.Name)
+
+
+	if noRecoilEnabled and RECOIL_NAMES[name] then
+		rememberPatch(obj, "Value", obj.Value)
+		obj.Value = obj.Value * (1 - math.clamp(recoilStrength / 100, 0, 1))
+	end
+
+	if noReloadEnabled and RELOAD_NAMES[name] then
+		rememberPatch(obj, "Value", obj.Value)
+		obj.Value = 0
+	end
+
+	if noReloadEnabled and AMMO_NAMES[name] then
+		rememberPatch(obj, "Value", obj.Value)
+		if obj.Value < 999 then obj.Value = 999 end
+	end
+end
+
+local function patchAttributes(tool)
+	for attrName, value in pairs(tool:GetAttributes()) do
+		if typeof(value) ~= "number" then continue end
+		local name = normalizedName(attrName)
+
+		if noRecoilEnabled and RECOIL_NAMES[name] then
+			rememberPatch(tool, "Attribute:" .. attrName, value)
+			tool:SetAttribute(attrName, value * (1 - math.clamp(recoilStrength / 100, 0, 1)))
+		elseif noReloadEnabled and RELOAD_NAMES[name] then
+			rememberPatch(tool, "Attribute:" .. attrName, value)
+			tool:SetAttribute(attrName, 0)
+		elseif noReloadEnabled and AMMO_NAMES[name] then
+			rememberPatch(tool, "Attribute:" .. attrName, value)
+			tool:SetAttribute(attrName, math.max(value, 999))
+		end
+	end
+end
+
+local function patchCurrentTool()
+	local tool = getEquippedTool()
+	if not tool then return end
+
+	for _, obj in ipairs(tool:GetDescendants()) do
+		patchNumberObject(obj)
+	end
+	patchAttributes(tool)
+end
+
+local function restoreWeaponPatches()
+	for obj, props in pairs(weaponPatches) do
+		if obj and obj.Parent then
+			for key, oldValue in pairs(props) do
+				pcall(function()
+					if key:sub(1, 10) == "Attribute:" then
+						obj:SetAttribute(key:sub(11), oldValue)
+					else
+						obj[key] = oldValue
+					end
+				end)
+			end
+		end
+	end
+	table.clear(weaponPatches)
+end
+
+local function refreshWeaponPatches()
+	restoreWeaponPatches()
+	patchCurrentTool()
+end
+
+
+local function stopRecoilStabilizer()
+	if recoilConnection then
+		recoilConnection:Disconnect()
+		recoilConnection = nil
+	end
+	pcall(function() RunService:UnbindFromRenderStep("BoostLabNoRecoil") end)
+	lastCameraCFrame = nil
+	lastCameraPosition = nil
+end
+
+local function startRecoilStabilizer()
+	stopRecoilStabilizer()
+	if not noRecoilEnabled then return end
+
+	local last = workspace.CurrentCamera and workspace.CurrentCamera.CFrame or nil
+	local lastMouse = Vector2.zero
+	local residualPitch = 0
+	local residualYaw = 0
+
+	RunService:BindToRenderStep("BoostLabNoRecoil", Enum.RenderPriority.Camera.Value + 20, function()
+		if not noRecoilEnabled then return end
+		local camera = workspace.CurrentCamera
+		if not camera then return end
+		Camera = camera
+
+		local current = camera.CFrame
+		if not last then
+			last = current
+			return
+		end
+
+		local rel = last:ToObjectSpace(current)
+		local pitch, yaw, roll = rel:ToOrientation()
+		local mouse = UserInputService:GetMouseDelta()
+
+		-- Learn the normal camera response to mouse movement. Recoil usually appears
+		-- as rotational movement that is not explained by the current mouse input.
+		local explainedPitch = -mouse.Y * 0.0025
+		local explainedYaw = -mouse.X * 0.0025
+		local residualP = pitch - explainedPitch
+		local residualY = yaw - explainedYaw
+
+		-- Ignore tiny normal camera noise, but catch both recoil kicks and sustained recoil.
+		if math.abs(residualP) > math.rad(0.08) or math.abs(residualY) > math.rad(0.08) then
+			local factor = math.clamp(recoilStrength / 100, 0, 1)
+			local correctionP = math.clamp(residualP * factor, -math.rad(8), math.rad(8))
+			local correctionY = math.clamp(residualY * factor, -math.rad(8), math.rad(8))
+			camera.CFrame = current * CFrame.Angles(-correctionP, -correctionY, -roll * factor)
+			current = camera.CFrame
+		end
+
+		last = current
+		lastMouse = mouse
+	end)
+end
+
+-- Refresh whenever the player equips/unequips a Tool or a weapon config changes.
+local function watchCharacter(char)
+	for _, c in ipairs(weaponWatchConnections) do pcall(function() c:Disconnect() end) end
+	table.clear(weaponWatchConnections)
+
+	local function watchTool(tool)
+		if not tool:IsA("Tool") then return end
+		-- Weapon watcher used only for No Recoil / No Reload patch refresh.
+	end
+
+	for _, obj in ipairs(char:GetChildren()) do
+		if obj:IsA("Tool") then watchTool(obj) end
+	end
+
+	table.insert(weaponWatchConnections, char.ChildAdded:Connect(function(obj)
+		if obj:IsA("Tool") then
+			task.wait()
+			watchTool(obj)
+			if noRecoilEnabled or noReloadEnabled then refreshWeaponPatches() end
+		end
+	end))
+
+	table.insert(weaponWatchConnections, char.ChildRemoved:Connect(function(obj)
+		if obj:IsA("Tool") then
+			if noRecoilEnabled or noReloadEnabled then refreshWeaponPatches() end
+		end
+	end))
+end
+
+if LocalPlayer.Character then watchCharacter(LocalPlayer.Character) end
+
+
+LocalPlayer.CharacterAdded:Connect(function(char)
+	stopRecoilStabilizer()
+	task.wait(0.2)
+	watchCharacter(char)
+	if noRecoilEnabled or noReloadEnabled then
+		refreshWeaponPatches()
+		startRecoilStabilizer()
+	end
+end)
+
+CombatTab:CreateSection("Universal Weapon")
+
+
+CombatTab:CreateToggle({
+	Name = "No Recoil",
+	CurrentValue = false,
+	Flag = "UniversalNoRecoil",
+	Callback = function(value)
+		noRecoilEnabled = value
+		if value then
+			refreshWeaponPatches()
+			startRecoilStabilizer()
+		else
+			stopRecoilStabilizer()
+			if noRecoilEnabled or noReloadEnabled then refreshWeaponPatches() else restoreWeaponPatches() end
+		end
+		Rayfield:Notify({
+			Title = "No Recoil " .. (value and "Enabled" or "Disabled"),
+			Content = value and "Local camera recoil compensation enabled." or "Recoil compensation stopped.",
+			Duration = 2,
+		})
+	end,
+})
+
+CombatTab:CreateSlider({
+	Name = "Recoil Reduction",
+	Range = { 0, 100 },
+	Increment = 5,
+	Suffix = "%",
+	CurrentValue = 100,
+	Flag = "UniversalRecoilReduction",
+	Callback = function(value)
+		recoilStrength = value
+		if noRecoilEnabled then
+			refreshWeaponPatches()
+			startRecoilStabilizer()
+		end
+	end,
+})
+
+CombatTab:CreateToggle({
+	Name = "No Reload",
+	CurrentValue = false,
+	Flag = "UniversalNoReload",
+	Callback = function(value)
+		noReloadEnabled = value
+		if value then
+			refreshWeaponPatches()
+		else
+			restoreWeaponPatches()
+			if noRecoilEnabled or noReloadEnabled then refreshWeaponPatches() end
+		end
+		Rayfield:Notify({
+			Title = "No Reload " .. (value and "Enabled" or "Disabled"),
+			Content = value and "Exposed reload timers are forced to zero." or "Reload values restored.",
+			Duration = 2,
+		})
+	end,
+})
+
+CombatTab:CreateParagraph({
+	Title = "Weapon Compatibility",
+	Content = "No Recoil and No Reload use exposed client-side weapon values when available and a camera compensation layer for recoil. Custom weapon systems may require their own weapon module integration.",
+})
+
+-- ============================================================
+-- MOVEMENT TAB
+-- ============================================================
+MovementTab:CreateParagraph({
+	Title = "Movement",
+	Content = "Fly, noclip, speed, jump and camera controls in one place.",
+})
+MovementTab:CreateSection("Flight")
+
+local flying = false
+local flySpeed = 50
+local bodyVelocity, bodyGyro
+local flyConnection
+
+local function getHRP()
+	local char = LocalPlayer.Character
+	return char and char:FindFirstChild("HumanoidRootPart")
+end
+
+local function startFly()
+	local hrp = getHRP()
+	if not hrp or flying then return end
+	flying = true
+
+	bodyVelocity = Instance.new("BodyVelocity")
+	bodyVelocity.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
+	bodyVelocity.Velocity = Vector3.new(0, 0, 0)
+	bodyVelocity.Parent = hrp
+
+	bodyGyro = Instance.new("BodyGyro")
+	bodyGyro.MaxTorque = Vector3.new(math.huge, math.huge, math.huge)
+	bodyGyro.P = 3000
+	bodyGyro.Parent = hrp
+
+	local humanoid = LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
+	if humanoid then
+		humanoid.PlatformStand = true
+	end
+
+	flyConnection = RunService.RenderStepped:Connect(function()
+		local hrpNow = getHRP()
+		if not hrpNow or not bodyVelocity then return end
+
+		local camera = workspace.CurrentCamera
+		local moveVector = Vector3.new(0, 0, 0)
+
+		if UserInputService:IsKeyDown(Enum.KeyCode.W) then
+			moveVector += camera.CFrame.LookVector
+		end
+		if UserInputService:IsKeyDown(Enum.KeyCode.S) then
+			moveVector -= camera.CFrame.LookVector
+		end
+		if UserInputService:IsKeyDown(Enum.KeyCode.A) then
+			moveVector -= camera.CFrame.RightVector
+		end
+		if UserInputService:IsKeyDown(Enum.KeyCode.D) then
+			moveVector += camera.CFrame.RightVector
+		end
+		if UserInputService:IsKeyDown(Enum.KeyCode.Space) then
+			moveVector += Vector3.new(0, 1, 0)
+		end
+		if UserInputService:IsKeyDown(Enum.KeyCode.LeftControl) then
+			moveVector += Vector3.new(0, -1, 0)
+		end
+
+		if moveVector.Magnitude > 0 then
+			moveVector = moveVector.Unit * flySpeed
+		end
+
+		bodyVelocity.Velocity = moveVector
+		bodyGyro.CFrame = camera.CFrame
+	end)
+end
+
+local function stopFly()
+	flying = false
+	if flyConnection then
+		flyConnection:Disconnect()
+		flyConnection = nil
+	end
+	if bodyVelocity then bodyVelocity:Destroy() end
+	if bodyGyro then bodyGyro:Destroy() end
+
+	local char = LocalPlayer.Character
+	local humanoid = char and char:FindFirstChildOfClass("Humanoid")
+	if humanoid then
+		humanoid.PlatformStand = false
+	end
+end
+
+LocalPlayer.CharacterAdded:Connect(function()
+	flying = false
+	bodyVelocity = nil
+	bodyGyro = nil
+end)
+
+MovementTab:CreateToggle({
+	Name = "Enable Fly",
+	CurrentValue = false,
+	Flag = "FlyToggle",
+	Callback = function(value)
+		if value then
+			startFly()
+		else
+			stopFly()
+		end
+		Rayfield:Notify({ Title = "Fly " .. (value and "Enabled" or "Disabled"), Content = "", Duration = 2 })
+	end,
+})
+
+MovementTab:CreateSlider({
+	Name = "Fly Speed",
+	Range = { 10, 200 },
+	Increment = 10,
+	Suffix = " studs/s",
+	CurrentValue = 50,
+	Flag = "FlySpeedSlider",
+	Callback = function(value)
+		flySpeed = value
+	end,
+})
+
+-- ============================================================
+-- PLAYER TOOLS
+-- ============================================================
+MovementTab:CreateSection("Player Tools")
+
+-- Robust infinite-jump handler. JumpRequest alone can be unreliable in some experiences,
+-- so we also listen for the actual keyboard/gamepad jump input and force the Humanoid
+-- into Jumping while the feature is enabled.
+local infiniteJumpConnections = {}
+local function disconnectInfiniteJumpConnections()
+	for _, c in ipairs(infiniteJumpConnections) do
+		pcall(function() c:Disconnect() end)
+	end
+	table.clear(infiniteJumpConnections)
+end
+
+local function performInfiniteJump()
+	if not infiniteJumpEnabled or not boostLabActive then return end
+	local humanoid = getHumanoid()
+	if not humanoid or humanoid.Health <= 0 then return end
+	if humanoid:GetState() == Enum.HumanoidStateType.Seated then return end
+
+	pcall(function()
+		humanoid.Jump = true
+		humanoid:ChangeState(Enum.HumanoidStateType.Jumping)
+	end)
+end
+
+-- Mobile/controller/keyboard-friendly Roblox jump event.
+table.insert(infiniteJumpConnections, UserInputService.JumpRequest:Connect(performInfiniteJump))
+table.insert(infiniteJumpConnections, UserInputService.InputBegan:Connect(function(input, gameProcessed)
+	if gameProcessed or not infiniteJumpEnabled then return end
+	if input.KeyCode == Enum.KeyCode.Space
+		or input.KeyCode == Enum.KeyCode.ButtonA then
+		performInfiniteJump()
+	end
+end))
+
+MovementTab:CreateToggle({
+	Name = "Infinite Jump",
+	CurrentValue = false,
+	Flag = "InfiniteJumpToggle",
+	Callback = function(value)
+		infiniteJumpEnabled = value
+		if value then
+			performInfiniteJump()
+		end
+	end,
+})
+local noFallDamageEnabled = false
+local noFallDamageConnections = {}
+local noFallDamageCharacterConnection
+local noFallDamageHealthBeforeFall = nil
+local noFallDamageWasFalling = false
+
+local function disconnectNoFallDamage()
+	for _, connection in ipairs(noFallDamageConnections) do
+		pcall(function() connection:Disconnect() end)
+	end
+	table.clear(noFallDamageConnections)
+
+	if noFallDamageCharacterConnection then
+		pcall(function() noFallDamageCharacterConnection:Disconnect() end)
+		noFallDamageCharacterConnection = nil
+	end
+end
+
+local function setupNoFallDamageCharacter(char)
+	if not noFallDamageEnabled then return end
+
+	disconnectNoFallDamage()
+
+	local humanoid = char:WaitForChild("Humanoid", 5)
+	local root = char:WaitForChild("HumanoidRootPart", 5)
+	if not humanoid or not root then return end
+
+	noFallDamageHealthBeforeFall = humanoid.Health
+	noFallDamageWasFalling = false
+
+	table.insert(noFallDamageConnections, humanoid.StateChanged:Connect(function(_, newState)
+		if not noFallDamageEnabled then return end
+
+		if newState == Enum.HumanoidStateType.Freefall
+			or newState == Enum.HumanoidStateType.FallingDown then
+			if not noFallDamageWasFalling then
+				noFallDamageHealthBeforeFall = humanoid.Health
+			end
+			noFallDamageWasFalling = true
+
+		elseif noFallDamageWasFalling
+			and (newState == Enum.HumanoidStateType.Landed
+				or newState == Enum.HumanoidStateType.Running
+				or newState == Enum.HumanoidStateType.RunningNoPhysics) then
+
+			-- Restore only damage that happened during the fall.
+			if noFallDamageHealthBeforeFall
+				and humanoid.Health < noFallDamageHealthBeforeFall
+				and humanoid.Health > 0 then
+				humanoid.Health = math.min(humanoid.MaxHealth, noFallDamageHealthBeforeFall)
+			end
+
+			noFallDamageWasFalling = false
+			noFallDamageHealthBeforeFall = humanoid.Health
+		end
+	end))
+
+	table.insert(noFallDamageConnections, humanoid.HealthChanged:Connect(function(health)
+		if not noFallDamageEnabled or not noFallDamageWasFalling then return end
+
+		-- Keep the pre-fall health as the reference while airborne.
+		-- This avoids interfering with normal damage outside a fall.
+		if noFallDamageHealthBeforeFall and health > noFallDamageHealthBeforeFall then
+			noFallDamageHealthBeforeFall = health
+		end
+	end))
+end
+
+MovementTab:CreateToggle({
+	Name = "No Fall Damage",
+	CurrentValue = false,
+	Flag = "NoFallDamageToggle",
+	Callback = function(value)
+		noFallDamageEnabled = value
+		disconnectNoFallDamage()
+
+		if value then
+			local char = LocalPlayer.Character
+			if char then
+				task.spawn(setupNoFallDamageCharacter, char)
+			end
+			noFallDamageCharacterConnection = LocalPlayer.CharacterAdded:Connect(function(char)
+				task.spawn(setupNoFallDamageCharacter, char)
+			end)
+		else
+			noFallDamageWasFalling = false
+			noFallDamageHealthBeforeFall = nil
+		end
+	end,
+})
+
+
+-- ============================================================
+-- NOCLIP
+-- ============================================================
+local noclipEnabled = false
+local noclipConnection
+local noclipDescendantConnection
+local noclipSavedCollision = setmetatable({}, { __mode = "k" })
+
+-- Noclip only removes collision from the local character. World/building parts remain
+-- visually unchanged, so walls do not become transparent or disappear; you simply pass through them.
+local function setCharacterCollision(enabled)
+	local char = LocalPlayer.Character
+	if not char then return end
+
+	for _, part in ipairs(char:GetDescendants()) do
+		if part:IsA("BasePart") then
+			if enabled then
+				local old = noclipSavedCollision[part]
+				part.CanCollide = old ~= nil and old or true
+				if old ~= nil then noclipSavedCollision[part] = nil end
+			else
+				if noclipSavedCollision[part] == nil then
+					noclipSavedCollision[part] = part.CanCollide
+				end
+				part.CanCollide = false
+			end
+		end
+	end
+end
+
+local function startNoclip()
+	if noclipConnection then noclipConnection:Disconnect() end
+	if noclipDescendantConnection then noclipDescendantConnection:Disconnect() end
+
+	local char = LocalPlayer.Character
+	if char then
+		noclipDescendantConnection = char.DescendantAdded:Connect(function(obj)
+			if noclipEnabled and obj:IsA("BasePart") then
+				if noclipSavedCollision[obj] == nil then
+					noclipSavedCollision[obj] = obj.CanCollide
+				end
+				obj.CanCollide = false
+			end
+		end)
+	end
+
+	-- Stepped is intentionally used so character collision is restored/disabled before physics resolves.
+	noclipConnection = RunService.Stepped:Connect(function()
+		if not noclipEnabled then return end
+		setCharacterCollision(false)
+	end)
+
+	setCharacterCollision(false)
+end
+
+local function stopNoclip()
+	if noclipConnection then noclipConnection:Disconnect(); noclipConnection = nil end
+	if noclipDescendantConnection then noclipDescendantConnection:Disconnect(); noclipDescendantConnection = nil end
+
+	local char = LocalPlayer.Character
+	if char then
+		for _, part in ipairs(char:GetDescendants()) do
+			if part:IsA("BasePart") then
+				local old = noclipSavedCollision[part]
+				if old ~= nil then
+					part.CanCollide = old
+					noclipSavedCollision[part] = nil
+				end
+			end
+		end
+	end
+end
+
+LocalPlayer.CharacterAdded:Connect(function(char)
+	char:WaitForChild("HumanoidRootPart", 5)
+	task.wait(0.15)
+	table.clear(noclipSavedCollision)
+	if noclipEnabled then startNoclip() end
+end)
+
+MovementTab:CreateToggle({
+	Name = "Noclip",
+	CurrentValue = false,
+	Flag = "NoclipToggle",
+	Callback = function(value)
+		noclipEnabled = value
+		if value then startNoclip() else stopNoclip() end
+		Rayfield:Notify({
+			Title = "Noclip " .. (value and "Enabled" or "Disabled"),
+			Content = value and "Collision disabled only — world remains visible" or "Normal collision restored",
+			Duration = 2
+		})
+	end,
+})
+
+-- ==== Walk Speed / Jump Power ====
+MovementTab:CreateSection("Player Movement")
+
+local function applyToHumanoid(applyFn)
+	local char = LocalPlayer.Character
+	local humanoid = char and char:FindFirstChildOfClass("Humanoid")
+	if humanoid then
+		applyFn(humanoid)
+	end
+end
+
+local currentWalkSpeed = 16
+local currentJumpPower = 50
+
+LocalPlayer.CharacterAdded:Connect(function(char)
+	local humanoid = char:WaitForChild("Humanoid")
+	humanoid.WalkSpeed = currentWalkSpeed
+	humanoid.JumpPower = currentJumpPower
+end)
+
+MovementTab:CreateSlider({
+	Name = "Walk Speed",
+	Range = { 16, 150 },
+	Increment = 2,
+	Suffix = " studs/s",
+	CurrentValue = 16,
+	Flag = "WalkSpeedSlider",
+	Callback = function(value)
+		currentWalkSpeed = value
+		applyToHumanoid(function(h) h.WalkSpeed = value end)
+	end,
+})
+
+MovementTab:CreateSlider({
+	Name = "Jump Power",
+	Range = { 50, 300 },
+	Increment = 10,
+	Suffix = "",
+	CurrentValue = 50,
+	Flag = "JumpPowerSlider",
+	Callback = function(value)
+		currentJumpPower = value
+		applyToHumanoid(function(h) h.JumpPower = value end)
+	end,
+})
+
+-- ============================================================
+-- CAMERA
+-- ============================================================
+MovementTab:CreateSection("Camera")
+
+MovementTab:CreateSlider({
+	Name = "Field of View",
+	Range = { 40, 120 },
+	Increment = 5,
+	Suffix = "°",
+	CurrentValue = 70,
+	Flag = "FOVSlider",
+	Callback = function(value)
+		local camera = workspace.CurrentCamera
+		if camera then camera.FieldOfView = value end
+	end,
+})
+
+-- ============================================================
+-- QUALITY OF LIFE
+-- ============================================================
+MiscTab:CreateSection("Quality of Life")
+
+local antiAfkConnection
+
+local function startAntiAfk()
+	if antiAfkConnection then antiAfkConnection:Disconnect() end
+	antiAfkConnection = LocalPlayer.Idled:Connect(function()
+		local VirtualUser = game:GetService("VirtualUser")
+		VirtualUser:Button2Down(Vector2.new(0, 0), workspace.CurrentCamera.CFrame)
+		task.wait(0.1)
+		VirtualUser:Button2Up(Vector2.new(0, 0), workspace.CurrentCamera.CFrame)
+	end)
+end
+
+MiscTab:CreateToggle({
+	Name = "Anti-AFK",
+	CurrentValue = true,
+	Flag = "AntiAFKToggle",
+	Callback = function(value)
+		if value then
+			startAntiAfk()
+		elseif antiAfkConnection then
+			antiAfkConnection:Disconnect()
+			antiAfkConnection = nil
+		end
+	end,
+})
+
+local savedLighting = {}
+
+local function setFullbright(enabled)
+	local Lighting = game:GetService("Lighting")
+	if enabled then
+		savedLighting.Brightness = Lighting.Brightness
+		savedLighting.ClockTime = Lighting.ClockTime
+		savedLighting.FogEnd = Lighting.FogEnd
+		savedLighting.GlobalShadows = Lighting.GlobalShadows
+		Lighting.Brightness = 3
+		Lighting.ClockTime = 14
+		Lighting.FogEnd = 100000
+		Lighting.GlobalShadows = false
+	else
+		if savedLighting.Brightness then Lighting.Brightness = savedLighting.Brightness end
+		if savedLighting.ClockTime then Lighting.ClockTime = savedLighting.ClockTime end
+		if savedLighting.FogEnd then Lighting.FogEnd = savedLighting.FogEnd end
+		if savedLighting.GlobalShadows ~= nil then Lighting.GlobalShadows = savedLighting.GlobalShadows end
+	end
+end
+
+MiscTab:CreateToggle({
+	Name = "Fullbright",
+	CurrentValue = false,
+	Flag = "FullbrightToggle",
+	Callback = function(value)
+		setFullbright(value)
+	end,
+})
+
+startAntiAfk()
+
+MiscTab:CreateSection("Security & Control")
+
+-- Moderator Protection:
+-- Optional local safeguard for games where staff accounts can be identified
+-- by configurable name prefixes / attributes. The callback only leaves the
+-- current client; it does not attempt to interfere with other players.
+local moderatorProtection = false
+local moderatorConnections = {}
+local moderatorLeaveInProgress = false
+
+local MODERATOR_NAME_PATTERNS = {
+    "mod", "moderator", "admin", "administrator", "staff", "developer", "dev", "owner"
+}
+
+local function disconnectModeratorProtection()
+    for _, connection in ipairs(moderatorConnections) do
+        pcall(function() connection:Disconnect() end)
+    end
+    table.clear(moderatorConnections)
+end
+
+local function isModeratorPlayer(player)
+    if not player or player == LocalPlayer then return false end
+
+    -- Explicit attributes take priority when a game exposes them.
+    local ok, values = pcall(function()
+        return {
+            player:GetAttribute("IsModerator"),
+            player:GetAttribute("IsAdmin"),
+            player:GetAttribute("IsStaff"),
+            player:GetAttribute("Moderator"),
+            player:GetAttribute("Admin"),
+            player:GetAttribute("Staff")
+        }
+    end)
+    if ok then
+        for _, value in ipairs(values) do
+            if value == true then return true end
+        end
+    end
+
+    local lowerName = string.lower(player.Name .. " " .. (player.DisplayName or ""))
+    for _, pattern in ipairs(MODERATOR_NAME_PATTERNS) do
+        if lowerName:find(pattern, 1, true) then
+            return true
+        end
+    end
+
+    return false
+end
+
+local function leaveBecauseModerator(player)
+    if moderatorLeaveInProgress then return end
+    moderatorLeaveInProgress = true
+    Rayfield:Notify({
+        Title = "Moderator Protection",
+        Content = "Staff account detected: " .. tostring(player.DisplayName or player.Name),
+        Duration = 1,
+    })
+    task.delay(0.2, function()
+        pcall(function()
+            game:GetService("TeleportService"):Teleport(game.PlaceId, LocalPlayer)
+        end)
+    end)
+end
+
+local function scanForModerators()
+    if not moderatorProtection or moderatorLeaveInProgress then return end
+    for _, player in ipairs(Players:GetPlayers()) do
+        if isModeratorPlayer(player) then
+            leaveBecauseModerator(player)
+            return
+        end
+    end
+end
+
+local function applyModeratorProtection()
+    disconnectModeratorProtection()
+    scanForModerators()
+
+    table.insert(moderatorConnections, Players.PlayerAdded:Connect(function(player)
+        task.defer(function()
+            if moderatorProtection and isModeratorPlayer(player) then
+                leaveBecauseModerator(player)
+            end
+        end)
+    end))
+
+    table.insert(moderatorConnections, Players.PlayerRemoving:Connect(function()
+        task.defer(scanForModerators)
+    end))
+
+    table.insert(moderatorConnections, RunService.Heartbeat:Connect(function()
+        scanForModerators()
+    end))
+end
+
+MiscTab:CreateToggle({
+    Name = "Moderator Protection",
+    CurrentValue = false,
+    Flag = "ModeratorProtectionToggle",
+    Callback = function(value)
+        moderatorProtection = value
+        moderatorLeaveInProgress = false
+        if value then
+            applyModeratorProtection()
+            Rayfield:Notify({
+                Title = "Moderator Protection",
+                Content = "Automatic staff detection enabled.",
+                Duration = 3
+            })
+        else
+            disconnectModeratorProtection()
+            Rayfield:Notify({
+                Title = "Moderator Protection",
+                Content = "Protection disabled.",
+                Duration = 2
+            })
+        end
+    end,
+})
+
+local function unloadBoostLab()
+	if not boostLabActive then return end
+	boostLabActive = false
+	-- Stop our own connections/features.
+	pcall(function() stopFly() end)
+	pcall(function() stopNoclip() end)
+	pcall(function() disconnectInfiniteJumpConnections() end)
+	table.clear(noclipSavedCollision)
+	pcall(function() disconnectModeratorProtection() end)
+	pcall(function() restoreUltimate() end)
+	ultimateStartedFPSBooster = false
+	pcall(function() disableFPSBooster() end)
+	pcall(function() if recoilConnection then recoilConnection:Disconnect(); recoilConnection = nil end end)
+	pcall(function() restoreWeaponPatches() end)
+	pcall(function() for _, c in ipairs(weaponWatchConnections) do c:Disconnect() end table.clear(weaponWatchConnections) end)
+	pcall(function()
+        for _, c in ipairs(buildWatcherConnections) do c:Disconnect() end
+        table.clear(buildWatcherConnections)
+    end)
+    pcall(function() buildRestoreAll() end)
+	pcall(function() if fpsGui then fpsGui:Destroy() end end)
+
+	-- Hide ESP objects.
+	for player in pairs(espObjects) do
+		pcall(function() destroyESPFor(player) end)
+	end
+
+	-- Hide FOV.
+	pcall(function() fovCircle.Visible = false end)
+
+	-- Disconnect every connection we created where references are available.
+	pcall(function()
+		if antiAfkConnection then
+			antiAfkConnection:Disconnect()
+			antiAfkConnection = nil
+		end
+	end)
+
+	-- Destroy the Rayfield GUI.
+	pcall(function()
+		if Window then
+			Rayfield:Destroy()
+		end
+	end)
+
+	-- Mark the feature as fully unloaded; active loops return immediately.
+	_G.BoostLabUnloaded = true
+
+	-- Remove any remaining BoostLab ScreenGui instances.
+	local playerGui = LocalPlayer:FindFirstChildOfClass("PlayerGui")
+	if playerGui then
+		for _, gui in ipairs(playerGui:GetChildren()) do
+			if gui.Name == "BoostLab" or gui.Name == "BoostLabIntro" then
+				pcall(function() gui:Destroy() end)
+			end
+		end
+	end
+end
+
+MiscTab:CreateButton({
+	Name = "Unload Script",
+	Callback = function()
+		unloadBoostLab()
+	end,
+})
+
+
+-- ============================================================
+-- FPS TAB
+-- ============================================================
+FPSTab:CreateSection("Performance")
+
+-- FPS counter: compact purple display, slightly below the top-right edge.
+local fpsGui = Instance.new("ScreenGui")
+fpsGui.Name = "BoostLabFPS"
+fpsGui.ResetOnSpawn = false
+fpsGui.IgnoreGuiInset = true
+fpsGui.DisplayOrder = 1000
+fpsGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
+
+local fpsLabel = Instance.new("TextLabel")
+fpsLabel.AnchorPoint = Vector2.new(1, 0)
+fpsLabel.Position = UDim2.new(1, -18, 0, 42)
+fpsLabel.Size = UDim2.new(0, 115, 0, 28)
+fpsLabel.BackgroundTransparency = 1
+fpsLabel.Text = "FPS: --"
+fpsLabel.Font = Enum.Font.GothamBold
+fpsLabel.TextSize = 17
+fpsLabel.TextColor3 = Color3.fromRGB(190, 80, 255)
+fpsLabel.TextStrokeTransparency = 0.45
+fpsLabel.TextXAlignment = Enum.TextXAlignment.Right
+fpsLabel.Parent = fpsGui
+
+local fpsEnabled = true
+local fpsFrames = 0
+local fpsElapsed = 0
+
+RunService.RenderStepped:Connect(function(dt)
+	if not boostLabActive or not fpsEnabled then return end
+	fpsFrames += 1
+	fpsElapsed += dt
+	if fpsElapsed >= 0.5 then
+		local fps = math.floor((fpsFrames / fpsElapsed) + 0.5)
+		fpsLabel.Text = "FPS: " .. tostring(fps)
+		fpsFrames = 0
+		fpsElapsed = 0
+	end
+end)
+
+FPSTab:CreateToggle({
+	Name = "FPS Display",
+	CurrentValue = true,
+	Flag = "FPSDisplayToggle",
+	Callback = function(value)
+		fpsEnabled = value
+		fpsLabel.Visible = value
+		if value then
+			fpsFrames = 0
+			fpsElapsed = 0
+		end
+	end,
+})
+
+-- Reversible local performance mode.
+-- It reduces visual overhead without permanently deleting game instances.
+local fpsBoosterEnabled = false
+local ultimateStartedFPSBooster = false
+local savedVisualState = {}
+local savedLightingState = {}
+local savedEffectsState = {}
+local function saveOnce(key, value)
+	if savedVisualState[key] == nil then
+		savedVisualState[key] = value
+	end
+end
+
+
+local function enableFPSBooster()
+	if fpsBoosterEnabled then return end
+	fpsBoosterEnabled = true
+
+	local Lighting = game:GetService("Lighting")
+	savedLightingState.Brightness = Lighting.Brightness
+	savedLightingState.GlobalShadows = Lighting.GlobalShadows
+	savedLightingState.FogEnd = Lighting.FogEnd
+
+	Lighting.GlobalShadows = false
+	Lighting.FogEnd = 100000
+
+	for _, obj in ipairs(Lighting:GetChildren()) do
+		if obj:IsA("PostEffect") then
+			savedEffectsState[obj] = obj.Enabled
+			obj.Enabled = false
+		end
+	end
+
+	for _, obj in ipairs(workspace:GetDescendants()) do
+		if obj:IsA("BasePart") then
+			saveOnce(obj, {
+				Material = obj.Material,
+				Reflectance = obj.Reflectance,
+				CastShadow = obj.CastShadow
+			})
+			obj.Material = Enum.Material.SmoothPlastic
+			obj.Reflectance = 0
+			obj.CastShadow = false
+		elseif obj:IsA("Decal") or obj:IsA("Texture") then
+			saveOnce(obj, {Transparency = obj.Transparency})
+			obj.Transparency = 1
+		elseif obj:IsA("ParticleEmitter") or obj:IsA("Trail") or obj:IsA("Beam") then
+			saveOnce(obj, {Enabled = obj.Enabled})
+			obj.Enabled = false
+		elseif obj:IsA("Highlight") then
+			saveOnce(obj, {Enabled = obj.Enabled})
+			obj.Enabled = false
+		end
+	end
+
+end
+
+local function disableFPSBooster()
+	if not fpsBoosterEnabled then return end
+	fpsBoosterEnabled = false
+
+
+	local Lighting = game:GetService("Lighting")
+	if savedLightingState.Brightness ~= nil then Lighting.Brightness = savedLightingState.Brightness end
+	if savedLightingState.GlobalShadows ~= nil then Lighting.GlobalShadows = savedLightingState.GlobalShadows end
+	if savedLightingState.FogEnd ~= nil then Lighting.FogEnd = savedLightingState.FogEnd end
+
+	for obj, state in pairs(savedEffectsState) do
+		if obj and obj.Parent then obj.Enabled = state end
+	end
+
+	for obj, state in pairs(savedVisualState) do
+		if obj and obj.Parent then
+			if obj:IsA("BasePart") then
+				obj.Material = state.Material
+				obj.Reflectance = state.Reflectance
+				obj.CastShadow = state.CastShadow
+			elseif obj:IsA("Decal") or obj:IsA("Texture") then
+				obj.Transparency = state.Transparency
+			elseif obj:IsA("ParticleEmitter") or obj:IsA("Trail") or obj:IsA("Beam") or obj:IsA("Highlight") then
+				obj.Enabled = state.Enabled
+			end
+		end
+	end
+
+	table.clear(savedVisualState)
+	table.clear(savedLightingState)
+	table.clear(savedEffectsState)
+end
+
+FPSTab:CreateToggle({
+	Name = "FPS Booster",
+	CurrentValue = false,
+	Flag = "FPSBoosterToggle",
+	Callback = function(value)
+		if value then
+			enableFPSBooster()
+		else
+			if UltimateToggle and ultimateFPS then
+				UltimateToggle:Set(false)
+			end
+			disableFPSBooster()
+		end
+		Rayfield:Notify({
+			Title = "FPS Booster " .. (value and "Enabled" or "Disabled"),
+			Content = value and "Textures, effects, shadows and detail were reduced locally" or "Original visual settings restored",
+			Duration = 3
+		})
+	end,
+})
+
+
+
+FPSTab:CreateParagraph({
+	Title = "Performance Mode",
+	Content = "FPS Booster lowers local visual detail, reduces effects, shadows and surface detail, and is fully reversible.",
+})
+
+FPSTab:CreateSection("Ultimate Performance")
+
+-- ============================================================
+-- ULTIMATE FPS ENGINE
+-- Local-only, reversible render optimization.
+-- Gameplay-critical models, tools and interactive objects are protected.
+-- ============================================================
+
+local ultimateFPS = false
+local ultimateRemoved = 0
+local ultimateOriginalParents = {}
+local ultimateStates = {}
+local ultimateConnections = {}
+local ultimateHiddenGuis = {}
+local ultimateLightingState = {}
+local ultimateSkyParents = {}
+local ultimateQualityState = {}
+local ultimateBlockNewObjects = true
+local ultimateKnownWorkspaceRoots = {}
+local ultimateBlockedObjects = {}
+
+local function ultimateProtected(obj)
+	if not obj then return true end
+	local char = LocalPlayer.Character
+	if char and obj:IsDescendantOf(char) then return true end
+	if obj:GetAttribute("BoostLabKeep") == true or obj:GetAttribute("NoRemove") == true then return true end
+	if obj:IsA("Terrain") then return true end
+
+	local model = obj:FindFirstAncestorOfClass("Model")
+	if model then
+		if model:FindFirstChildOfClass("Humanoid") then return true end
+		if model:FindFirstChildOfClass("Tool") then return true end
+	end
+	return false
+end
+
+local function ultimateTinyDecoration(part)
+	if not part:IsA("BasePart") or ultimateProtected(part) then return false end
+
+	local size = part.Size
+	local volume = size.X * size.Y * size.Z
+
+	-- Very small visual clutter only.
+	if volume > 1.5 or math.max(size.X, size.Y, size.Z) > 2 then return false end
+
+	-- Never remove anything that participates in normal gameplay physics.
+	if part.CanCollide or part.CanTouch or part.CanQuery then return false end
+
+	for _, child in ipairs(part:GetChildren()) do
+		if child:IsA("WeldConstraint") or child:IsA("Weld")
+			or child:IsA("Motor6D") or child:IsA("ClickDetector")
+			or child:IsA("ProximityPrompt") or child:IsA("TouchTransmitter") then
+			return false
+		end
+	end
+
+	local ok, connected = pcall(function()
+		return part:GetConnectedParts(true)
+	end)
+	if ok and #connected > 1 then return false end
+
+	return true
+end
+
+local function ultimateSave(obj, state)
+	if ultimateStates[obj] == nil then
+		ultimateStates[obj] = state
+	end
+end
+
+local function ultimateHideGui(obj)
+	if obj:GetAttribute("BoostLabKeep") == true then return end
+
+	if obj:IsA("GuiObject") and obj.Visible then
+		ultimateHiddenGuis[obj] = true
+		obj.Visible = false
+	elseif obj:IsA("BillboardGui") or obj:IsA("SurfaceGui") then
+		if obj.Enabled then
+			ultimateHiddenGuis[obj] = true
+			obj.Enabled = false
+		end
+	end
+end
+
+local function ultimateHideLighting()
+	local Lighting = game:GetService("Lighting")
+
+	ultimateLightingState = {
+		GlobalShadows = Lighting.GlobalShadows,
+		Brightness = Lighting.Brightness,
+		FogEnd = Lighting.FogEnd,
+		EnvironmentDiffuseScale = Lighting.EnvironmentDiffuseScale,
+		EnvironmentSpecularScale = Lighting.EnvironmentSpecularScale,
+		ExposureCompensation = Lighting.ExposureCompensation,
+	}
+
+	Lighting.GlobalShadows = false
+	Lighting.Brightness = 0
+	Lighting.FogEnd = 1000000
+	Lighting.EnvironmentDiffuseScale = 0
+	Lighting.EnvironmentSpecularScale = 0
+	Lighting.ExposureCompensation = 0
+
+	for _, child in ipairs(Lighting:GetChildren()) do
+		if child:IsA("Sky") then
+			ultimateSkyParents[child] = child.Parent
+			child.Parent = nil
+		elseif child:IsA("PostEffect") then
+			ultimateSave(child, {Enabled = child.Enabled})
+			child.Enabled = false
+		end
+	end
+end
+
+local function ultimateRestoreLighting()
+	local Lighting = game:GetService("Lighting")
+
+	for sky, parent in pairs(ultimateSkyParents) do
+		if sky and not sky.Parent then
+			pcall(function() sky.Parent = parent or Lighting end)
+		end
+	end
+	table.clear(ultimateSkyParents)
+
+	for property, value in pairs(ultimateLightingState) do
+		pcall(function() Lighting[property] = value end)
+	end
+	table.clear(ultimateLightingState)
+end
+
+local function ultimateRememberWorkspaceRoots()
+	table.clear(ultimateKnownWorkspaceRoots)
+	for _, child in ipairs(workspace:GetChildren()) do
+		ultimateKnownWorkspaceRoots[child] = true
+	end
+end
+
+local function ultimateCanBlockNewObject(obj)
+	if not ultimateBlockNewObjects or not obj then return false end
+	if ultimateProtected(obj) then return false end
+	if obj:IsA("Terrain") then return false end
+
+	-- Only block clearly visual-only roots. Interactive/gameplay roots stay alive.
+	local hasVisual = false
+	local hasInteractive = false
+
+	local function inspect(item)
+		if item:IsA("BasePart") then
+			hasVisual = true
+			if item.CanCollide or item.CanTouch or item.CanQuery then
+				hasInteractive = true
+			end
+		elseif item:IsA("Decal") or item:IsA("Texture")
+			or item:IsA("ParticleEmitter") or item:IsA("Trail")
+			or item:IsA("Beam") or item:IsA("Smoke") or item:IsA("Fire")
+			or item:IsA("Sparkles") or item:IsA("Highlight")
+			or item:IsA("BillboardGui") or item:IsA("SurfaceGui") then
+			hasVisual = true
+		elseif item:IsA("ProximityPrompt") or item:IsA("ClickDetector")
+			or item:IsA("Tool") or item:IsA("Humanoid") then
+			hasInteractive = true
+		end
+	end
+
+	inspect(obj)
+	for _, item in ipairs(obj:GetDescendants()) do
+		if item:IsA("Humanoid") or item:IsA("Tool") then
+			return false
+		end
+		inspect(item)
+	end
+
+	return hasVisual and not hasInteractive
+end
+
+local function ultimateBlockNewWorkspaceRoot(obj)
+	if not ultimateBlockNewObjects or not obj or not obj.Parent then return end
+	if obj.Parent ~= workspace then return end
+	if ultimateKnownWorkspaceRoots[obj] then return end
+	if not ultimateCanBlockNewObject(obj) then return end
+
+	-- Keep a reference so disabling Ultimate can restore the object.
+	ultimateBlockedObjects[obj] = true
+	ultimateOriginalParents[obj] = workspace
+	obj.Parent = nil
+	ultimateRemoved += 1
+end
+
+local function ultimateOptimize(obj)
+	if not obj or ultimateProtected(obj) then return end
+
+	if obj:IsA("BasePart") then
+		if ultimateTinyDecoration(obj) then
+			ultimateOriginalParents[obj] = obj.Parent
+			obj.Parent = nil
+			ultimateRemoved += 1
+			return
+		end
+
+		ultimateSave(obj, {
+			Material = obj.Material,
+			Reflectance = obj.Reflectance,
+			CastShadow = obj.CastShadow,
+		})
+		obj.Material = Enum.Material.SmoothPlastic
+		obj.Reflectance = 0
+		obj.CastShadow = false
+
+	elseif obj:IsA("Decal") or obj:IsA("Texture") then
+		ultimateSave(obj, {Transparency = obj.Transparency})
+		obj.Transparency = 1
+
+	elseif obj:IsA("ParticleEmitter") or obj:IsA("Trail")
+		or obj:IsA("Beam") or obj:IsA("Smoke")
+		or obj:IsA("Fire") or obj:IsA("Sparkles")
+		or obj:IsA("Highlight") then
+
+		ultimateSave(obj, {Enabled = obj.Enabled})
+		obj.Enabled = false
+		ultimateRemoved += 1
+
+	elseif obj:IsA("BillboardGui") or obj:IsA("SurfaceGui") then
+		ultimateHideGui(obj)
+	end
+end
+
+local function ultimateOptimizeWorld()
+	for _, obj in ipairs(workspace:GetDescendants()) do
+		ultimateOptimize(obj)
+	end
+end
+
+local function ultimateStartConnections()
+	for _, c in ipairs(ultimateConnections) do
+		pcall(function() c:Disconnect() end)
+	end
+	table.clear(ultimateConnections)
+
+	table.insert(ultimateConnections, workspace.DescendantAdded:Connect(function(obj)
+		if not ultimateFPS then return end
+
+		task.defer(function()
+			if not ultimateFPS or not obj or not obj.Parent then return end
+
+			-- If a completely new top-level Workspace object appears,
+			-- block it locally before it can become part of the rendered world.
+		if obj.Parent == workspace then
+				ultimateBlockNewWorkspaceRoot(obj)
+				return
+			end
+
+			-- For content inside an existing protected/gameplay root,
+			-- only apply render optimizations.
+			if obj.Parent then
+				ultimateOptimize(obj)
+			end
+		end)
+	end))
+
+	-- PlayerGui is intentionally not modified by Ultimate.
+	-- The game's UI remains visible while this mode is active.
+end
+
+local function ultimateStopConnections()
+	for _, c in ipairs(ultimateConnections) do
+		pcall(function() c:Disconnect() end)
+	end
+	table.clear(ultimateConnections)
+end
+
+local function ultimateHideAllGui()
+	local pg = LocalPlayer:FindFirstChildOfClass("PlayerGui")
+	if not pg then return end
+	for _, obj in ipairs(pg:GetDescendants()) do
+		ultimateHideGui(obj)
+	end
+end
+
+local function ultimateRestoreGui()
+	for obj, state in pairs(ultimateHiddenGuis) do
+		if obj and obj.Parent then
+			pcall(function()
+				if obj:IsA("GuiObject") then
+					obj.Visible = state
+				elseif obj:IsA("BillboardGui") or obj:IsA("SurfaceGui") then
+					obj.Enabled = state
+				end
+			end)
+		end
+	end
+	table.clear(ultimateHiddenGuis)
+end
+
+local function enableUltimateFPS()
+	if ultimateFPS then return end
+	ultimateFPS = true
+	ultimateRemoved = 0
+
+	-- Ultimate may temporarily use the normal booster, but remembers
+	-- whether it was already enabled so disabling Ultimate can restore
+	-- the exact previous state.
+	ultimateStartedFPSBooster = false
+	if not fpsBoosterEnabled then
+		enableFPSBooster()
+		ultimateStartedFPSBooster = true
+	end
+
+	-- UI stays visible in Ultimate mode.
+	-- Remember everything that already exists so only NEW
+	-- Workspace roots are blocked after activation.
+	ultimateRememberWorkspaceRoots()
+	ultimateHideLighting()
+	ultimateOptimizeWorld()
+	ultimateStartConnections()
+
+	Rayfield:Notify({
+		Title = "Ultimate FPS Booster",
+		Content = "Extreme local render optimization enabled. Hidden/optimized: " .. tostring(ultimateRemoved) .. " effects/objects.",
+		Duration = 4
+	})
+end
+
+local function restoreUltimate()
+	ultimateFPS = false
+	ultimateStopConnections()
+
+	-- Restore removed instances in parent-first order. The old implementation
+	-- iterated a Lua table in arbitrary order, so a child could be restored
+	-- before its removed parent and remain detached.
+	local pending = {}
+	for obj, parent in pairs(ultimateOriginalParents) do
+		table.insert(pending, {object = obj, parent = parent})
+	end
+
+	local function depth(inst)
+		local n = 0
+		local current = inst
+		while current and current ~= workspace do
+			n += 1
+			current = current.Parent
+			if n > 100 then break end
+		end
+		return n
+	end
+
+	table.sort(pending, function(a, b)
+		return depth(a.object) < depth(b.object)
+	end)
+
+	-- Multiple passes also handle cases where an original parent was itself
+	-- temporarily detached.
+	for _ = 1, 4 do
+		local changed = false
+		for _, item in ipairs(pending) do
+			local obj, parent = item.object, item.parent
+			if obj and not obj.Parent and parent and parent.Parent then
+				local ok = pcall(function() obj.Parent = parent end)
+				if ok and obj.Parent == parent then
+					changed = true
+				end
+			end
+		end
+		if not changed then break end
+	end
+
+	ultimateRestoreLighting()
+
+	for obj, state in pairs(ultimateStates) do
+		if obj and obj.Parent then
+			pcall(function()
+				if state.Material then
+					obj.Material = state.Material
+					obj.Reflectance = state.Reflectance
+					obj.CastShadow = state.CastShadow
+				elseif state.Transparency ~= nil then
+					obj.Transparency = state.Transparency
+				elseif state.Enabled ~= nil then
+					obj.Enabled = state.Enabled
+				end
+			end)
+		end
+	end
+
+	table.clear(ultimateOriginalParents)
+	table.clear(ultimateBlockedObjects)
+	table.clear(ultimateKnownWorkspaceRoots)
+	table.clear(ultimateStates)
+	table.clear(ultimateHiddenGuis)
+	table.clear(ultimateSkyParents)
+	ultimateRemoved = 0
+end
+
+local function disableUltimateFPS()
+	if not ultimateFPS then return end
+	restoreUltimate()
+
+	-- If Ultimate itself enabled the normal FPS Booster, turn it back off.
+	-- If the user had FPS Booster enabled before Ultimate, leave it enabled.
+	if ultimateStartedFPSBooster then
+		ultimateStartedFPSBooster = false
+		disableFPSBooster()
+	end
+
+	Rayfield:Notify({
+		Title = "Ultimate FPS Booster",
+		Content = "Original locally changed visuals restored.",
+		Duration = 3
+	})
+end
+
+local UltimateSection = FPSTab:CreateSection("Ultimate FPS Booster")
+
+FPSTab:CreateParagraph({
+	Title = "Extreme Mode",
+	Content = "Extreme local render mode. Your UI stays visible while the sky, post effects, shadows, textures, particles and tiny decorative clutter are optimized. New top-level Workspace objects can be blocked locally so newly spawned world content is not rendered.",
+})
+
+local UltimateToggle = FPSTab:CreateToggle({
+	Name = "Ultimate FPS Booster",
+	CurrentValue = false,
+	Flag = "UltimateFPSBoosterToggle",
+	Callback = function(value)
+		if value then
+			enableUltimateFPS()
+		else
+			disableUltimateFPS()
+		end
+	end,
+})
+
+FPSTab:CreateToggle({
+	Name = "Block New World Objects",
+	CurrentValue = true,
+	Flag = "UltimateBlockNewObjectsToggle",
+	Callback = function(value)
+		ultimateBlockNewObjects = value
+		if ultimateFPS and value then
+			ultimateRememberWorkspaceRoots()
+		end
+	end,
+})
+
+FPSTab:CreateButton({
+	Name = "Reapply Ultimate Cleanup",
+	Callback = function()
+		if ultimateFPS then
+			ultimateRememberWorkspaceRoots()
+			ultimateOptimizeWorld()
+			Rayfield:Notify({Title = "Ultimate Cleanup", Content = "Loaded world optimized again. UI remains visible.", Duration = 2})
+		else
+			Rayfield:Notify({Title = "Ultimate Cleanup", Content = "Enable Ultimate FPS Booster first.", Duration = 2})
+		end
+	end,
+})
+
+FPSTab:CreateParagraph({
+	Title = "Protected",
+	Content = "Your character, humanoid/tool models, interactive physics parts, Terrain and objects marked BoostLabKeep/NoRemove are protected. New world roots can be blocked locally and restored when Ultimate is disabled.",
+})
+
+
+-- ============================================================
+-- BUILDS TAB
+-- Optimized local build visibility controls.
+-- Work is processed in small batches to avoid freezing/lag spikes.
+BuildsTab:CreateParagraph({
+    Title = "Build Controls",
+    Content = "Hide selected world-build categories locally. Changes are processed in batches to reduce lag and are fully reversible.",
+})
+
+local buildStates = {
+    Doors = false,
+    Gates = false,
+    Walls = false,
+    Windows = false,
+    Fences = false,
+    Barriers = false,
+    Roofs = false,
+    Props = false,
+}
+
+local buildSaved = setmetatable({}, { __mode = "k" })
+local buildWatcherConnections = {}
+local buildQueue = {}
+local buildQueued = setmetatable({}, { __mode = "k" })
+local buildScanToken = 0
+
+local BUILD_PATTERNS = {
+    Doors = {"door", "doorframe", "doorway"},
+    Gates = {"gate", "gatehouse", "barriergate"},
+    Walls = {"wall", "wallsegment", "brickwall", "concretewall", "stonewall"},
+    Windows = {"window", "windowframe", "glasswindow"},
+    Fences = {"fence", "railing", "bannister"},
+    Barriers = {"barrier", "barricade", "roadblock", "roadblocker"},
+    Roofs = {"roof", "ceiling"},
+    Props = {"prop", "decoration", "decor"},
+}
+
+local BUILD_CATEGORY_ORDER = {"Doors", "Gates", "Walls", "Windows", "Fences", "Barriers", "Roofs", "Props"}
+
+local function buildNormalize(text)
+    return tostring(text or ""):lower():gsub("[%s%p_%-]+", "")
+end
+
+local buildCategoryCache = setmetatable({}, { __mode = "k" })
+local function buildCategoryFor(obj)
+    if not obj then return nil end
+    local cached = buildCategoryCache[obj]
+    if cached ~= nil then return cached or nil end
+
+    local current = obj
+    for _ = 1, 4 do
+        if not current then break end
+        local name = buildNormalize(current.Name)
+        for _, category in ipairs(BUILD_CATEGORY_ORDER) do
+            for _, pattern in ipairs(BUILD_PATTERNS[category]) do
+                local p = buildNormalize(pattern)
+                if name == p or name:find(p, 1, true) then
+                    buildCategoryCache[obj] = category
+                    return category
+                end
+            end
+        end
+        current = current.Parent
+    end
+
+    buildCategoryCache[obj] = false
+    return nil
+end
+
+local function buildIsProtected(obj)
+    if not obj then return true end
+    if LocalPlayer.Character and obj:IsDescendantOf(LocalPlayer.Character) then return true end
+    if workspace.CurrentCamera and obj:IsDescendantOf(workspace.CurrentCamera) then return true end
+    local n = buildNormalize(obj.Name)
+    return n:find("boostlabkeep", 1, true) ~= nil or n:find("noremove", 1, true) ~= nil
+end
+
+local function buildSaveOriginal(obj)
+    if buildSaved[obj] ~= nil or not obj:IsA("BasePart") or buildIsProtected(obj) then return end
+    buildSaved[obj] = {
+        LocalTransparencyModifier = obj.LocalTransparencyModifier,
+        CanCollide = obj.CanCollide,
+        CanTouch = obj.CanTouch,
+        CanQuery = obj.CanQuery,
+    }
+end
+
+local function buildApplyPart(obj, hidden)
+    if not obj:IsA("BasePart") or buildIsProtected(obj) then return end
+    if hidden then
+        buildSaveOriginal(obj)
+        obj.LocalTransparencyModifier = 1
+        obj.CanCollide = false
+        obj.CanTouch = false
+        obj.CanQuery = false
+    else
+        local original = buildSaved[obj]
+        if original then
+            obj.LocalTransparencyModifier = original.LocalTransparencyModifier
+            obj.CanCollide = original.CanCollide
+            obj.CanTouch = original.CanTouch
+            obj.CanQuery = original.CanQuery
+            buildSaved[obj] = nil
+        end
+    end
+end
+
+local function queueBuildObject(obj)
+    if not obj or not obj.Parent or buildQueued[obj] then return end
+    buildQueued[obj] = true
+    buildQueue[#buildQueue + 1] = obj
+end
+
+local function clearBuildQueue()
+    table.clear(buildQueue)
+    table.clear(buildQueued)
+end
+
+-- Small-batch worker: prevents a full GetDescendants pass from blocking frames.
+task.spawn(function()
+    while boostLabActive do
+        local processed = 0
+        while processed < 80 and #buildQueue > 0 do
+            local obj = table.remove(buildQueue, 1)
+            buildQueued[obj] = nil
+            if obj and obj.Parent and boostLabActive then
+                local category = buildCategoryFor(obj)
+                if category and buildStates[category] then
+                    buildApplyPart(obj, true)
+                end
+            end
+            processed += 1
+        end
+        task.wait()
+    end
+end)
+
+local function buildQueueWorldScan()
+    buildScanToken += 1
+    local token = buildScanToken
+    clearBuildQueue()
+    local descendants = workspace:GetDescendants()
+    task.spawn(function()
+        for i, obj in ipairs(descendants) do
+            if token ~= buildScanToken or not boostLabActive then return end
+            queueBuildObject(obj)
+            if i % 250 == 0 then task.wait() end
+        end
+    end)
+end
+
+local function buildRestoreCategory(category)
+    for obj, original in pairs(buildSaved) do
+        if obj and obj.Parent and buildCategoryFor(obj) == category then
+            buildApplyPart(obj, false)
+        end
+    end
+end
+
+local function buildRestoreAll()
+    buildScanToken += 1
+    clearBuildQueue()
+    for obj, original in pairs(buildSaved) do
+        if obj and obj.Parent then
+            pcall(function()
+                obj.LocalTransparencyModifier = original.LocalTransparencyModifier
+                obj.CanCollide = original.CanCollide
+                obj.CanTouch = original.CanTouch
+                obj.CanQuery = original.CanQuery
+            end)
+        end
+        buildSaved[obj] = nil
+    end
+end
+
+for _, connection in ipairs(buildWatcherConnections) do
+    pcall(function() connection:Disconnect() end)
+end
+table.clear(buildWatcherConnections)
+
+table.insert(buildWatcherConnections, workspace.DescendantAdded:Connect(function(obj)
+    if boostLabActive then queueBuildObject(obj) end
+end))
+
+table.insert(buildWatcherConnections, workspace.DescendantRemoving:Connect(function(obj)
+    buildSaved[obj] = nil
+    buildQueued[obj] = nil
+end))
+
+local function setBuildCategory(category, enabled)
+    buildStates[category] = enabled
+    if enabled then
+        buildQueueWorldScan()
+        Rayfield:Notify({
+            Title = category .. " Enabled",
+            Content = "Processing matching objects in small batches.",
+            Duration = 2,
+        })
+    else
+        buildRestoreCategory(category)
+        Rayfield:Notify({
+            Title = category .. " Disabled",
+            Content = "Original local values restored.",
+            Duration = 2,
+        })
+    end
+end
+
+for _, category in ipairs(BUILD_CATEGORY_ORDER) do
+    BuildsTab:CreateToggle({
+        Name = "Hide " .. category,
+        CurrentValue = false,
+        Flag = "BuildHide" .. category,
+        Callback = function(value)
+            setBuildCategory(category, value)
+        end,
+    })
+end
+
+BuildsTab:CreateButton({
+    Name = "Rescan Builds",
+    Callback = function()
+        buildQueueWorldScan()
+        Rayfield:Notify({Title = "Builds", Content = "Queued a lightweight build rescan.", Duration = 2})
+    end,
+})
+
+BuildsTab:CreateButton({
+    Name = "Restore All Builds",
+    Callback = function()
+        for category in pairs(buildStates) do
+            buildStates[category] = false
+        end
+        buildRestoreAll()
+        Rayfield:Notify({Title = "Builds", Content = "All build changes restored.", Duration = 2})
+    end,
+})
+
+
+
+MiscTab:CreateSection("Community")
+
+MiscTab:CreateParagraph({
+	Title = "BoostLab Community",
+	Content = "Join our Discord for updates, support and to suggest features. Subscribe on YouTube for showcases and tutorials.",
+})
+
+MiscTab:CreateButton({
+	Name = "Copy Discord Link",
+	Callback = function()
+		setclipboard("https://discord.gg/RfVsQcyUZp")
+		Rayfield:Notify({ Title = "Copied!", Content = "Discord link copied to clipboard", Duration = 3 })
+	end,
+})
+
+MiscTab:CreateButton({
+	Name = "Copy YouTube Link",
+	Callback = function()
+		setclipboard("https://www.youtube.com/@BoostLab-dll")
+		Rayfield:Notify({ Title = "Copied!", Content = "YouTube link copied to clipboard", Duration = 3 })
+	end,
+})
